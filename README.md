@@ -21,3 +21,7 @@ BN层是对同一批数据同一通道计算均值与方差
 BN层训练需要控制training参数，使用时batch_size尽量大
 
 尽量放在Conv和激活层（如ReLU）之间，同时Conv层不需要bias
+
+### nn.Identity
+
+原封不动的输出

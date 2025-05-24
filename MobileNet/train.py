@@ -9,13 +9,13 @@ def train(net_name, epochs=20, learn_rate=0.0002):
     train_num, validate_num, train_loader, validate_loader = get_data_loader()
     if os.path.exists(save_path):
         print(net_name + "模型已存在，继续训练！")
-        #! 迁移学习
-        pre_weight = torch.load(save_path)
-        pre_dict = {k : v for k, v in pre_weight.items() if "classifier" not in k}
-        missing_keys, unexpected_keys = net.load_state_dict(pre_dict, strict=False)
-        for param in net.features.parameters():
-            param.requires_grad = False
-        # net.load_state_dict(torch.load(save_path))
+        # #! 迁移学习
+        # pre_weight = torch.load(save_path)
+        # pre_dict = {k : v for k, v in pre_weight.items() if "classifier" not in k}
+        # missing_keys, unexpected_keys = net.load_state_dict(pre_dict, strict=False)
+        # for param in net.features.parameters():
+        #     param.requires_grad = False
+        net.load_state_dict(torch.load(save_path))
     else:
         print(net_name + "模型不存在")
     net.train()

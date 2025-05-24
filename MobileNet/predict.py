@@ -24,8 +24,7 @@ def main():
         json_file = open(class_indices, "r")
         class_indict = json.load(json_file)
     except Exception as e:
-        print(e)
-        exit(-1)
+        raise FileExistsError("{} is not exist".format(class_indices))
     net.load_state_dict(torch.load(save_path))
     net.eval()
     with torch.no_grad():
