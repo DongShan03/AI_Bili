@@ -1,7 +1,7 @@
 import os, torch
-from modelV3 import mobilenet_v3_large as Net
+from modelV2 import shufflenetv2_x1_5 as Net
 batch_size = 32
-net_name = "mobilenet_v3_large"
+net_name = "shufflenetv2_x1_5"
 data_name = "flower_data"
 epochs = 5
 num_classes = 5
