@@ -13,18 +13,23 @@ class BasicBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(out_channels, out_channels*self.expansion,
                                 kernel_size=3, stride=1, padding=1, bias=False)
+
         self.bn2 = nn.BatchNorm2d(out_channels*self.expansion)
         self.downsample = downsample
 
     def forward(self, x):
         identity = x
+        #! N x in x W x H
         if self.downsample is not None:
             identity = self.downsample(x)
+
         out = self.conv1(x)
+        #! N x out x W x H (stride = 1) or N x out x W/2 x H/2
         out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
+        #! N x out x W x H (stride = 1) or N x out x W/2 x H/2
         out = self.bn2(out)
         out += identity
         out = self.relu(out)
@@ -75,8 +80,10 @@ class ResNet(nn.Module):
         self.in_channel = 64
         self.groups = groups
         self.width_per_group = width_per_group
+        #! N x 3 x 224 x 224
         self.conv1 = nn.Conv2d(3, self.in_channel, kernel_size=7,
                                 stride=2, padding=3, bias=False)
+        #! N x 64 x 112 x 112
         self.bn1 = nn.BatchNorm2d(self.in_channel)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
