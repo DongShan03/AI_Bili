@@ -9,6 +9,9 @@ from preprocess import get_data_loader
 def train(net_name, epochs=20, learn_rate=0.0002):
     writer = SummaryWriter(os.path.join(cfg['dir_root'], "log"), comment=cfg['data_name'])
     train_num, validate_num, train_loader, validate_loader = get_data_loader()
+    if not os.path.exists(os.path.dirname(cfg["structure"])):
+        os.mkdir(os.path.dirname(cfg["structure"]))
+
     if os.path.exists(cfg["structure"]):
         print(net_name + "模型结构已存在！")
     else:
@@ -23,6 +26,8 @@ def train(net_name, epochs=20, learn_rate=0.0002):
         writer.add_graph(cfg["net"], torch.zeros(cfg["batch_size"], 3, cfg["img_size"], cfg["img_size"]).to(cfg["device"]))
         print("模型结构绘制成功!")
 
+    if not os.path.exists(os.path.dirname(cfg["save_path"])):
+        os.mkdir(os.path.dirname(cfg["save_path"]))
     if os.path.exists(cfg["save_path"]):
         print(net_name + "_" + cfg["data_name"] + "模型已存在，继续训练！")
         # #! 迁移学习

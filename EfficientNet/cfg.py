@@ -15,8 +15,9 @@ cfg = {
 }
 
 cfg.update({"data_root": os.path.join(cfg['dir_root'], "..", "data", cfg["data_name"]),
-            "save_path": os.path.join(cfg['dir_root'], cfg['net_name'] + '_' + cfg['data_name'] + ".pth"),
+            "save_path": os.path.join(cfg['dir_root'], "model_trained", cfg['net_name'] + '_' + cfg['data_name'] + ".pth"),
+            "structure": os.path.join(cfg['dir_root'], "model_structure", cfg['net_name'] + "_structure" + '.txt'),
             "net": Net(num_classes=cfg['num_classes']).to(cfg["device"]),
-            "structure": os.path.join(cfg['dir_root'], cfg['net_name'] + "_structure" + '.txt')})
+            })
 
 cfg.update({'class_indices': os.path.join(cfg['data_root'], "class_indices.json")})
