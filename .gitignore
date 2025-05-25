@@ -180,4 +180,4 @@ cython_debug/
 class_*.json
 
 # tensorboard
-log/
+*log/

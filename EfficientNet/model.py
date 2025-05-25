@@ -85,6 +85,7 @@ class SqueezeExcitation(nn.Module):
 
     def forward(self, x):
         scale = F.adaptive_avg_pool2d(x, (1, 1))
+        #* scale = x.mean([2, 3], keepdim=True)
         scale = self.fc1(scale)
         scale = self.ac1(scale)
         scale = self.fc2(scale)

@@ -7,7 +7,7 @@ from cfg import cfg
 from preprocess import get_data_loader
 
 def train(net_name, epochs=20, learn_rate=0.0002):
-    writer = SummaryWriter(os.path.join(cfg['dir_root'], "log"), comment=cfg['data_name'])
+    writer = SummaryWriter(os.path.join(cfg['dir_root'], cfg["net_name"] + "_log"), comment=cfg['data_name'])
     train_num, validate_num, train_loader, validate_loader = get_data_loader()
     if not os.path.exists(os.path.dirname(cfg["structure"])):
         os.mkdir(os.path.dirname(cfg["structure"]))
@@ -78,8 +78,8 @@ def train(net_name, epochs=20, learn_rate=0.0002):
             if accurate_test > best_acc:
                 best_acc = accurate_test
                 torch.save(cfg["net"].state_dict(), cfg["save_path"])
-            writer.add_scalar("scalar/test_accuracy", accurate_test, epoch)
-            writer.add_scalar("scalar/train_loss", train_loss, epoch)
+            writer.add_scalar("scalar/" + cfg['net_name'] + '_' + cfg['data_name'] + "test_accuracy", accurate_test, epoch)
+            writer.add_scalar("scalar/" + cfg['net_name'] + '_' + cfg['data_name'] + "train_loss", train_loss, epoch)
             print('[epoch %d] train_loss: %.3f  test_accuracy: %.3f' %
                 (epoch + 1, train_loss, accurate_test))
 
@@ -87,6 +87,7 @@ def train(net_name, epochs=20, learn_rate=0.0002):
 
 def main():
     train(cfg["net_name"], epochs=cfg["epochs"], learn_rate=cfg["learn_rate"])
+    cfg["writer"].close()
 
 if __name__ == "__main__":
     main()

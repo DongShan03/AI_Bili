@@ -1,12 +1,12 @@
 import os, torch
 #! 在这更换要使用的网络
-from model import efficientnet_b1 as Net
+from model import efficientnet_b2 as Net
 
 cfg = {
     "batch_size": 32,
     "net_name": getattr(Net, "__name__"),
     "data_name": "flower_data",
-    "epochs": 50,
+    "epochs": 100,
     "num_classes": 5,
     "learn_rate": 0.0002,
     "img_size": Net.img_size,
