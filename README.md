@@ -25,3 +25,7 @@ BN层训练需要控制training参数，使用时batch_size尽量大
 ### nn.Identity
 
 原封不动的输出
+
+### tensorboard
+
+运行命令：tensorboard --logdir  dir_log_path
