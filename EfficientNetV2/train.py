@@ -1,7 +1,6 @@
 import torch.optim as optim
 import torch.nn as nn
-import os, time, torch, sys
-from torchsummary import summary
+import os, time, torch
 from tensorboardX import SummaryWriter
 from cfg import cfg
 from preprocess import get_data_loader
@@ -16,29 +15,25 @@ def train(net_name, epochs=20, learn_rate=0.0002):
         print(net_name + "模型结构已存在！")
     else:
         print(net_name + "模型结构不存在！")
-        original_stdout = sys.stdout
         with open(cfg["structure"], 'w', encoding='utf-8') as f:
-            sys.stdout = f
-            summary(cfg["net"],input_size=(3, cfg["img_size"], cfg["img_size"]))
-        f.close()
-        sys.stdout = original_stdout
+            f.write(str(cfg["net"]))
         #! tensorboard 模型图
-        writer.add_graph(cfg["net"], torch.zeros(cfg["batch_size"], 3, cfg["img_size"], cfg["img_size"]).to(cfg["device"]))
+        writer.add_graph(cfg["net"], torch.zeros(cfg["batch_size"], 3, cfg["train_size"], cfg["train_size"]).to(cfg["device"]))
         print("模型结构绘制成功!")
-
     if not os.path.exists(os.path.dirname(cfg["save_path"])):
         os.mkdir(os.path.dirname(cfg["save_path"]))
     if os.path.exists(cfg["save_path"]):
-        print(net_name + "_" + cfg["data_name"] + "模型已存在，继续训练！")
-        # #! 迁移学习
-        # pre_weight = torch.load(save_path)
-        # pre_dict = {k : v for k, v in pre_weight.items() if "classifier" not in k}
-        # missing_keys, unexpected_keys = net.load_state_dict(pre_dict, strict=False)
-        # for param in net.features.parameters():
-        #     param.requires_grad = False
+        print(net_name + "_" + cfg["data_name"] + "模型存在!")
         cfg["net"].load_state_dict(torch.load(cfg["save_path"]))
+        # #! 迁移学习
+        if cfg["transfer_learning"]:
+            print("使用迁移学习,冻结除最后一层的所有参数!")
+            for name, para in cfg["net"].named_parameters():
+                if "head" not in name:
+                    para.requires_grad_(False)
     else:
-        print(net_name + "_" + cfg["data_name"] + "模型不存在")
+        print(net_name + "_" + cfg["data_name"] + "模型不存在!")
+    print("开始训练!")
     cfg["net"].train()
     #* 从这准备训练
     loss_function = nn.CrossEntropyLoss()

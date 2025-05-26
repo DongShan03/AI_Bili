@@ -1,15 +1,17 @@
 import os, torch
 #! 在这更换要使用的网络
-from model import efficientnet_b1 as Net
+from model import efficientV2_s as Net
 
 cfg = {
-    "batch_size": 32,
+    "batch_size": 16,
     "net_name": getattr(Net, "__name__"),
     "data_name": "flower_data",
-    "epochs": 80,
+    "epochs": 40,
     "num_classes": 5,
     "learn_rate": 0.0002,
-    "img_size": Net.img_size,
+    "transfer_learning": False,           #! 是否使用(迁移)学习
+    "train_size": Net.train_size,
+    "eval_size": Net.eval_size,
     "dir_root": os.path.dirname(__file__),
     "device": torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
 }
