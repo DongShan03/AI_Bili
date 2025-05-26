@@ -22,6 +22,12 @@ BN层训练需要控制training参数，使用时batch_size尽量大
 
 尽量放在Conv和激活层（如ReLU）之间，同时Conv层不需要bias
 
+### GN层
+
+GroupNorm：将channel方向分group，然后每个group内做归一化，算(C//G)x*Hx*W的均值
+
+GN 的计算与批量大小无关，其精度也在各种批量大小下保持稳定。
+
 ### nn.Identity
 
 原封不动的输出
