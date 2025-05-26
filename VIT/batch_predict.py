@@ -17,10 +17,10 @@ def get_pic():
     ])
     imgs = []
 
-    for img_path in os.listdir(os.path.join(cfg["dir_root"], "test")):
+    for img_path in os.listdir(os.path.join(cfg["data_root"], "test")):
         if img_path.endswith(".jpg"):
             imgs_path.append(os.path.join("test", img_path))
-            img = Image.open(os.path.join(cfg["dir_root"], "test", img_path))
+            img = Image.open(os.path.join(cfg["data_root"], "test", img_path))
             img = data_transform(img)
             imgs.append(img)
 

@@ -1,14 +1,19 @@
 import os, torch
 from model import resnext50_32x4d as Net
-batch_size = 32
-net_name = "resnext50_32x4d"
-data_name = "flower_data"
-epochs = 20
-num_classes = 5
-learn_rate = 0.0004
-dir_root = os.path.dirname(__file__)
-data_root = os.path.join(dir_root, "..", "data", data_name)
-class_indices = os.path.join(data_root, "class_indices.json")
-save_path = os.path.join(dir_root, net_name + '_' + data_name + ".pth")
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net = Net(num_classes=num_classes, init_weights=True).to(device)
+
+cfg = {
+    "batch_size": 32,
+    "net_name": getattr(Net, "__name__"),
+    "data_name": "flower_data",
+    "epochs": 20,
+    "num_classes": 5,
+    "learn_rate": 0.0002,
+    "dir_root": os.path.dirname(__file__),
+    "device": torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
+}
+
+cfg.update({"data_root": os.path.join(cfg['dir_root'], "..", "data", cfg["data_name"]),
+            "save_path": os.path.join(cfg['dir_root'], cfg['net_name'] + '_' + cfg['data_name'] + ".pth"),
+            "net": Net(num_classes=cfg['num_classes']).to(cfg["device"])})
+
+cfg.update({'class_indices': os.path.join(cfg['data_root'], "class_indices.json")})
