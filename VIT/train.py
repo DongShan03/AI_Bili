@@ -3,8 +3,7 @@ import os, torch, math
 from tensorboardX import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
 from cfg import cfg
-from preprocess import preprocess
-from utils import train_one_epoch, evaluate
+from utils import train_one_epoch, evaluate, preprocess
 
 def train(net_name, epochs=20, learn_rate=0.0002):
     writer = SummaryWriter(os.path.join(cfg['dir_root'], cfg["net_name"] + "_log"), comment=cfg['data_name'])
@@ -29,12 +28,10 @@ def train(net_name, epochs=20, learn_rate=0.0002):
             print("使用迁移学习,冻结除最后一层的所有参数!")
             pre_weight = torch.load(cfg["save_path"])
             pre_dict = {k : v for k, v in pre_weight.items() if "head" or "pre_logits" not in k}
-            missing_keys, unexpected_keys = cfg["net"].load_state_dict(pre_dict, strict=False)
+            cfg["net"].load_state_dict(pre_dict, strict=False)
             for name, param in cfg["net"].named_parameters():
                 if "head" not in name and "pre_logits" not in name:
                     param.requires_grad = False
-                else:
-                    print("Training {}  ".format(name), end="")
         else:
             cfg["net"].load_state_dict(torch.load(cfg["save_path"]))
     else:

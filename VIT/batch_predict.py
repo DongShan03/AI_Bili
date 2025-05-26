@@ -1,7 +1,7 @@
 from PIL import Image
 import json, os
 import torch
-from preprocess import preprocess
+from utils import preprocess
 from cfg import cfg
 
 
