@@ -1,20 +1,14 @@
 from PIL import Image
-from torchvision import transforms
-import matplotlib.pyplot as plt
 import json, os
 import torch
+from preprocess import preprocess
 from cfg import cfg
 
 
 imgs_path = []
 
 def get_pic():
-    data_transform = transforms.Compose([
-        transforms.Resize(cfg["eval_size"]),
-        transforms.CenterCrop(cfg["train_size"]),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
+    data_transform = preprocess.data_transform["val"]
     imgs = []
 
     for img_path in os.listdir(os.path.join(cfg["data_root"], "test")):
