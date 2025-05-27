@@ -1,6 +1,6 @@
 import os, torch
 #! 在这更换要使用的网络
-from model import swin_small_patch4_window7_224 as Net
+from model import convnext_small as Net
 
 cfg = {
     "batch_size": 32,
@@ -8,7 +8,8 @@ cfg = {
     "data_name": "flower_data",
     "epochs": 20,
     "num_classes": 5,
-    "learn_rate": 0.0002,
+    "learn_rate": 5e-4,
+    "weight_decay": 5e-2,
     "transfer_learning": False,           #! 是否使用(迁移)学习
     "train_size": Net.train_size,
     "eval_size": Net.eval_size,
