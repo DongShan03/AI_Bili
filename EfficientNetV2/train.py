@@ -24,7 +24,7 @@ def train(net_name, epochs=20, learn_rate=0.0002):
         os.mkdir(os.path.dirname(cfg["save_path"]))
     if os.path.exists(cfg["save_path"]):
         print(net_name + "_" + cfg["data_name"] + "模型存在!")
-        cfg["net"].load_state_dict(torch.load(cfg["save_path"]))
+        cfg["net"].load_state_dict(torch.load(cfg["save_path"]), strict=False)
         # #! 迁移学习
         if cfg["transfer_learning"]:
             print("使用迁移学习,冻结除最后一层的所有参数!")

@@ -57,7 +57,7 @@ def train(vgg_name, epochs=20, learn_rate=0.0002):
         print(vgg_name + "模型已存在，继续训练！")
         net = vgg(model_name=vgg_name, num_classes=5).to(device)
         model_weight_path = os.path.join(dir_root, vgg_name + ".pth")
-        net.load_state_dict(torch.load(model_weight_path))
+        net.load_state_dict(torch.load(model_weight_path), strict=False)
     else:
         print(vgg_name + "模型不存在")
         net = vgg(model_name=vgg_name, num_classes=5, init_weights=True).to(device)

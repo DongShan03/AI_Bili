@@ -9,7 +9,7 @@ cfg = {
     "epochs": 40,
     "num_classes": 5,
     "learn_rate": 0.0002,
-    "transfer_learning": False,           #! 是否使用(迁移)学习
+    "transfer_learning": True,           #! 是否使用(迁移)学习
     "train_size": Net.train_size,
     "eval_size": Net.eval_size,
     "dir_root": os.path.dirname(__file__),
