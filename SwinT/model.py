@@ -58,8 +58,8 @@ def window_reverse(windows, window_size, H, W):
     x = windows.view(B, H // window_size, W // window_size,
                     window_size, window_size, -1)
     #! permute -> [B, H // window_size, window_size, W // window_size, window_size, C]
-    x = x.permute(0, 1, 3, 2, 4, 5).contiguous()
-    return x.view(B, H, W, -1)
+    x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+    return x
 
 
 #? 用在最开始进行下采样为原先的1/4
@@ -120,7 +120,7 @@ class PatchMerging(nn.Module):
         x1 = x[:, 1::2, 0::2, :]  # [B, H/2, W/2, C]
         x2 = x[:, 0::2, 1::2, :]  # [B, H/2, W/2, C]
         x3 = x[:, 1::2, 1::2, :]  # [B, H/2, W/2, C]
-        x = torch.cat((x0, x1, x2, x3), dim=-1)  # [B, H/2, W/2, 4*C]
+        x = torch.cat([x0, x1, x2, x3], dim=-1)  # [B, H/2, W/2, 4*C]
         x = x.view(B, -1, 4 * C) # [B, H/2*W/2, 4*C]
         x = self.norm(x)  # [B, H/2*W/2, 4*C]
         x = self.reduction(x)  # [B, H/2*W/2, 2*C]
@@ -138,7 +138,6 @@ class Mlp(nn.Module):
         self.dropout1 = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(hidden_channel, output_channel)
         self.dropout2 = nn.Dropout(dropout_rate)
-
 
     def forward(self, x):
         x = self.fc1(x)
@@ -298,7 +297,7 @@ class SwinTransformerBlock(nn.Module):
             x = x[:, :H, :W, :].contiguous()
         x = x.view(B, H * W, C)  # [B, L, C]
         x = shortcut + self.drop_path(x)  # [B, L, C]
-        x = x = self.drop_path(self.mlp(self.norm2(x)))  # [B, L, C]
+        x = x + self.drop_path(self.mlp(self.norm2(x)))  # [B, L, C]
         return x
 
 
