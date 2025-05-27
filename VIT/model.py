@@ -95,21 +95,24 @@ class Attention(nn.Module):
         return x
 
 class Mlp(nn.Module):
-    def __init__(self, input_channel, hidden_channel=None, output_channel=None, act_layer=nn.GELU, dropout_rate=0.):
+    def __init__(self, input_channel, hidden_channel=None,
+                output_channel=None, act_layer=nn.GELU, dropout_rate=0.):
         super().__init__()
         hidden_channel = hidden_channel or input_channel
         output_channel = output_channel or input_channel
         self.fc1 = nn.Linear(input_channel, hidden_channel)
         self.ac = act_layer()
-        self.dropout = nn.Dropout(dropout_rate)
+        self.dropout1 = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(hidden_channel, output_channel)
+        self.dropout2 = nn.Dropout(dropout_rate)
+
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.ac(x)
-        x = self.dropout(x)
+        x = self.dropout1(x)
         x = self.fc2(x)
-        x = self.dropout(x)
+        x = self.dropout2(x)
         return x
 
 class Block(nn.Module):
