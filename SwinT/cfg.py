@@ -1,12 +1,12 @@
 import os, torch
 #! 在这更换要使用的网络
-from model import swin_tiny_patch4_window7_224 as Net
+from model import swin_small_patch4_window7_224 as Net
 
 cfg = {
-    "batch_size": 16,
+    "batch_size": 32,
     "net_name": getattr(Net, "__name__"),
     "data_name": "flower_data",
-    "epochs": 5,
+    "epochs": 50,
     "num_classes": 5,
     "learn_rate": 0.0002,
     "transfer_learning": True,           #! 是否使用(迁移)学习

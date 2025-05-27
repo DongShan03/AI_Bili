@@ -1,7 +1,6 @@
 import torch.optim as optim
 import os, torch, math
 from tensorboardX import SummaryWriter
-import torch.optim.lr_scheduler as lr_scheduler
 from cfg import cfg
 from utils import train_one_epoch, evaluate, preprocess
 
