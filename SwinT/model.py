@@ -35,6 +35,20 @@ class PatchEmbed(nn.Module):
         x = self.norm(x)
         return x, H, W
 
+class PatchMerging(nn.Module):
+    def __init__(self, dim, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.dim = dim
+        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+        self.norm = norm_layer(4 * dim)
+
+    def forward(self, x, H, W):
+        #! x: [B, H*W, C]
+        B, L, C = x.shape
+        assert L == H * W, "input feature has wrong size"
+
+        x = x.view(B, H, W, C)
+
 class BasicLayer(nn.Module):
     def __init__(self):
         super().__init__()
