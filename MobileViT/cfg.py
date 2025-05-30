@@ -6,7 +6,7 @@ cfg = {
     "batch_size": 32,
     "net_name": getattr(Net, "__name__"),
     "data_name": "flower_data",
-    "epochs": 20,
+    "epochs": 1,
     "num_classes": 5,
     "learn_rate": 5e-4,
     "weight_decay": 5e-2,

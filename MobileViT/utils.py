@@ -2,7 +2,8 @@ import torch, sys, os, json, math
 from tqdm import tqdm
 from torchvision import transforms, datasets
 from cfg import cfg
-
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from ConfusionMatrix import ConfusionMatrix
 class Preprocess:
     def __init__(self):
         super().__init__()
@@ -162,3 +163,20 @@ def create_lr_scheduler(optimizer, num_step, epochs, warmup=True,
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=f)
 
 preprocess = Preprocess()
+def plot_final():
+    json_file = open(cfg["class_indices"], 'r')
+    class_indict = json.load(json_file)
+    labels = [label for _, label in class_indict.items()]
+    confusion = ConfusionMatrix(num_classes=cfg["num_classes"], labels=labels)
+    cfg["net"].eval()
+    data_loader = tqdm(preprocess.validate_loader, file=sys.stdout, colour="green")
+    with torch.no_grad():
+        for step, val_data in enumerate(data_loader):
+            val_images, val_labels = val_data
+            outputs = cfg["net"](val_images.to(cfg["device"]))
+            outputs = torch.softmax(outputs, dim=1)
+            outputs = torch.argmax(outputs, dim=1)
+            confusion.update(outputs.to("cpu").numpy(), val_labels.to("cpu").numpy())
+            data_loader.desc = "Confusion Matrix evaluate"
+    confusion.plot(save_path=os.path.join(cfg["dir_root"], "confusion_matrix.png"))
+    confusion.summary()

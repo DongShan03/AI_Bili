@@ -2,7 +2,7 @@ import torch.optim as optim
 import os, torch, math
 from tensorboardX import SummaryWriter
 from cfg import cfg
-from utils import train_one_epoch, evaluate, preprocess, get_params_groups, create_lr_scheduler
+from utils import train_one_epoch, evaluate, preprocess, get_params_groups, create_lr_scheduler, plot_final
 
 
 def train(net_name, epochs=20, learn_rate=0.0002):
@@ -70,6 +70,7 @@ def train(net_name, epochs=20, learn_rate=0.0002):
             best_acc = val_acc
             torch.save(cfg["net"].state_dict(), cfg["save_path"])
     writer.close()
+    plot_final()
     print("Finished Training!")
 
 def main():
