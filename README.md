@@ -35,3 +35,11 @@ GN 的计算与批量大小无关，其精度也在各种批量大小下保持�
 ### tensorboard
 
 运行命令：tensorboard --logdir  dir_log_path
+
+### 图像分类模型
+
+包括: AlexNet ConvNeXt EfficientNet EfficientNetV2 GoogleNet MobileNet MobileViT RepVGG ResNet ShuffleNet SwinT VGG VIT
+
+### 图像目标检测
+
+包含: fasterRCNN
