@@ -37,7 +37,8 @@ def main():
 
     data_transform = {
         "train": transforms.Compose([transforms.ToTensor(),
-                                    transforms.RandomHorizontalFlip(0.5)]),
+                                    transforms.RandomHorizontalFlip(0.5),
+                                    transforms.RandomVerticalFlip(0.3)]),
         "val": transforms.Compose([transforms.ToTensor()])
     }
 

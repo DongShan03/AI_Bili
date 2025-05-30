@@ -28,3 +28,16 @@ class RandomHorizontalFlip(object):
             bbox[:, [0, 2]] = width - bbox[:, [2, 0]]
             target["boxes"] = bbox
         return image, target
+
+class RandomVerticalFlip(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+    def __call__(self, image, target):
+        if random.random() < self.prob:
+            height, width = image.shape[-2:]
+            image = image.flip(-2)
+            bbox = target["boxes"]
+            #! 同时翻转bbox
+            bbox[:, [1, 3]] = height - bbox[:, [3, 1]]
+            target["boxes"] = bbox
+        return image, target

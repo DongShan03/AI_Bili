@@ -25,7 +25,8 @@ def main(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     data_transform = {
         "train": transforms.Compose([transforms.ToTensor(),
-                                    transforms.RandomHorizontalFlip(0.5)]),
+                                    transforms.RandomHorizontalFlip(0.5),
+                                    transforms.RandomVerticalFlip(0.3)]),
         "val": transforms.Compose([transforms.ToTensor()])
     }
 
