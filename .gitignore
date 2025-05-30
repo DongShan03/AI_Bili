@@ -182,4 +182,5 @@ class_*.json
 # tensorboard
 *log*/
 
-#
+# data_image
+data/
