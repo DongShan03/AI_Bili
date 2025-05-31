@@ -1,3 +1,5 @@
+import sys, os
+sys.path.append(os.path.dirname(__file__))
 from rpn_function import AnchorsGenerator, RPNHead, RegionProposalNetwork
 from roi_head import RoIHeads
 from collections import OrderedDict
@@ -49,6 +51,7 @@ class FasterRCNNBase(nn.Module):
         if isinstance(features, torch.Tensor):
             features = OrderedDict([("0", features)])
         proposals, proposal_losses = self.rpn(images, features, targets)
+        #! 将RPN生成的标注信息输入faster RCNN后半部分
         detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
         detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
         losses = {}
@@ -153,7 +156,7 @@ class FasterRCNN(FasterRCNNBase):
 
         if box_roi_pool is None:
             box_roi_pool = MultiScaleRoIAlign(
-                featuremap_names = ["0", "1", "2", "3"],
+                featmap_names = ["0", "1", "2", "3"],
                 output_size = [7, 7],
                 sampling_ratio = 2
             )

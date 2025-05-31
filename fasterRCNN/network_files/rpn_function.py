@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.jit.annotations import List, Tuple, Optional, Dict
 from image_list import ImageList
-import det_utils
+import det_utils as det_utils
 import boxes as box_ops
 class AnchorsGenerator(nn.Module):
     __annotations__ = {
@@ -12,6 +12,7 @@ class AnchorsGenerator(nn.Module):
         "_cache": Dict[str, List[Tensor]]
     }
     def __init__(self, sizes=(128, 256, 512), aspect_ratios=(0.5, 1.0, 2.0)):
+        super().__init__()
         if not isinstance(sizes[0], (list, tuple)):
             sizes = tuple((s,) for s in sizes)
         if not isinstance(aspect_ratios[0], (list, tuple)):
@@ -21,6 +22,10 @@ class AnchorsGenerator(nn.Module):
         self.aspect_ratios = aspect_ratios
         self.cell_anchors = None
         self._cache = {}
+
+    def num_anchors_per_location(self):
+        # 计算每个预测特征层上每个滑动窗口的预测目标数
+        return [len(s) * len(a) for s, a in zip(self.sizes, self.aspect_ratios)]
 
     def generate_anchors(self, scales, aspect_ratios, dtype=torch.float32, device="cpu"):
         # type: (List[int], List[float], int, torch.device) -> Tensor
@@ -238,6 +243,63 @@ class RegionProposalNetwork(nn.Module):
             final_scores.append(scores)
         return final_boxes, final_scores
 
+    def assign_targets_to_anchors(self, anchors, targets):
+        # type: (List[Tensor], List[Dict[str, Tensor]]) -> Tuple[List[Tensor], List[Tensor]]
+        labels = []
+        matched_gt_boxes = []
+        for anchors_per_image, targets_per_image in zip(anchors, targets):
+            gt_boxes = targets_per_image['boxes']
+            if gt_boxes.numel() == 0:
+                # Background image
+                device = anchors_per_image.device
+                matched_gt_box_per_image = torch.zeros(anchors_per_image.shape, dtype=torch.float32, device=device)
+                labels_per_image = torch.zeros((anchors_per_image.shape[0], ), dtype=torch.float32, device=device)
+            else:
+                match_equality_matrix = box_ops.box_iou(gt_boxes, anchors_per_image)
+                matched_idx = self.proposal_matcher(match_equality_matrix)
+                matched_gt_box_per_image = gt_boxes[matched_idx.clamp(min=0)]
+                labels_per_image = matched_idx >= 0
+                #! 这里相当于把iou>=fg_iou_thresh的设置为1.0
+                labels_per_image = labels_per_image.to(dtype=torch.float32)
+                # 背景
+                bg_indices = matched_idx == self.proposal_matcher.BELOW_LOW_THRESHOLD
+                labels_per_image[bg_indices] = 0.0
+                # 丢弃
+                discard_indices = matched_idx == self.proposal_matcher.BETWEEN_THRESHOLDS
+                labels_per_image[discard_indices] = -1.0
+
+            labels.append(labels_per_image)
+            matched_gt_boxes.append(matched_gt_box_per_image)
+        return labels, matched_gt_boxes
+
+    def compute_loss(self, objectness, pred_bbox_deltas, labels, regression_targets):
+        # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
+        #! 计算RPN损失，包括类别损失（前景与背景），bbox regression损失
+        # 按照给定的batch_size_per_image, positive_fraction选择正负样本
+        sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)
+        sampled_pos_inds = torch.nonzero(torch.cat(sampled_pos_inds, dim=0)).squeeze(1)
+        sampled_neg_inds = torch.nonzero(torch.cat(sampled_neg_inds, dim=0)).squeeze(1)
+        #! 正负样本拼接
+        sampled_inds = torch.cat([sampled_pos_inds, sampled_neg_inds], dim=0)
+        objectness = objectness.flatten()
+
+        labels = torch.cat(labels, dim=0)
+        regression_targets = torch.cat(regression_targets, dim=0)
+
+        box_loss = det_utils.smooth_l1_loss(
+            pred_bbox_deltas[sampled_pos_inds],
+            regression_targets[sampled_pos_inds],
+            beta=1 / 9,
+            size_average=False,
+        ) / (sampled_pos_inds.numel() + 1e-6)
+
+        objectness_loss = F.binary_cross_entropy_with_logits(
+            objectness[sampled_inds], labels[sampled_inds]
+        )
+
+        return objectness_loss, box_loss
+
+
     def forward(self, images, features, targets=None):
         # type: (ImageList, Dict[str, Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[List[Tensor], Dict[str, Tensor]]
         # RPN does not need to compute the roi losses
@@ -253,13 +315,23 @@ class RegionProposalNetwork(nn.Module):
         num_anchors_per_level = [s[0] * s[1] * s[2] for s in num_anchors_per_level_shape_tensors]
         objectness, pred_bbox_deltas = concat_box_prediction_layers(objectness, pred_bbox_deltas)
         #* 将预测到的bbox regression参数应用到anchors得到最终的bbox坐标
-        proposals = self.box_coder.decoder(pred_bbox_deltas.detach(), anchors)
+        proposals = self.box_coder.decode(pred_bbox_deltas.detach(), anchors)
         proposals = proposals.view(num_images, -1, 4)
 
         boxes, scores = self.filter_proposals(proposals, objectness, images.image_sizes, num_anchors_per_level)
         losses = {}
-
-
+        if self.training:
+            assert targets is not None
+            labels, matched_gt_boxes = self.assign_targets_to_anchors(anchors, targets)
+            regression_targets = self.box_coder.encode(matched_gt_boxes, anchors)
+            loss_objectness, loss_rpn_box_reg = self.compute_loss(
+                objectness, pred_bbox_deltas, labels, regression_targets
+            )
+            losses = {
+                "loss_objectness": loss_objectness,
+                "loss_rpn_box_reg": loss_rpn_box_reg,
+            }
+        return boxes, losses
 
 
 def permute_and_flatten(x, N, A, C, H, W):

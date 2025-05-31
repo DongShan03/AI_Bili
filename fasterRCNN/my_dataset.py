@@ -18,7 +18,7 @@ class VOC2012DataSet(Dataset):
                             for line in f.readlines()]
 
         try:
-            json_file = open(os.path.join(self.root, "class_indices.json"), "r")
+            json_file = open(os.path.join(self.root, "pascal_voc_classes.json"), "r")
             self.class_indict = json.load(json_file)
         except Exception as e:
             print(e)

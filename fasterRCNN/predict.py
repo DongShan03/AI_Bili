@@ -1,4 +1,5 @@
-import os
+import os, sys
+sys.path.append(os.path.dirname(__file__))
 import time
 import json
 
@@ -8,32 +9,15 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 from torchvision import transforms
-from network_files import FasterRCNN, FastRCNNPredictor, AnchorsGenerator
-from backbone import resnet50_fpn_backbone, MobileNetV2
+from network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor, AnchorsGenerator
+from backbone.resnet50_fpn_model import resnet50_fpn_backbone
+
 from draw_box_utils import draw_objs
 
 
 def create_model(num_classes):
-    # mobileNetv2+faster_RCNN
-    # backbone = MobileNetV2().features
-    # backbone.out_channels = 1280
-    #
-    # anchor_generator = AnchorsGenerator(sizes=((32, 64, 128, 256, 512),),
-    #                                     aspect_ratios=((0.5, 1.0, 2.0),))
-    #
-    # roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],
-    #                                                 output_size=[7, 7],
-    #                                                 sampling_ratio=2)
-    #
-    # model = FasterRCNN(backbone=backbone,
-    #                    num_classes=num_classes,
-    #                    rpn_anchor_generator=anchor_generator,
-    #                    box_roi_pool=roi_pooler)
-
-    # resNet50+fpn+faster_RCNN
-    # 注意，这里的norm_layer要和训练脚本中保持一致
     backbone = resnet50_fpn_backbone(norm_layer=torch.nn.BatchNorm2d)
-    model = FasterRCNN(backbone=backbone, num_classes=num_classes, rpn_score_thresh=0.5)
+    model = FasterRCNN(backbone=backbone, num_classes=num_classes)
 
     return model
 
@@ -52,7 +36,7 @@ def main():
     model = create_model(num_classes=21)
 
     # load train weights
-    weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "model.pth")
+    weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "fasterrcnn_resnet50_fpn.pth")
     assert os.path.exists(weights_path), "{} file dose not exist.".format(weights_path)
     weights_dict = torch.load(weights_path, map_location='cpu')
     weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict

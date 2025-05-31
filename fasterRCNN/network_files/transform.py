@@ -62,7 +62,7 @@ class GeneralizedRCNNTransform(nn.Module):
 
     def batch_images(self, images, size_divisible=32):
         # type: (List[Tensor], int) -> Tensor
-        max_size = self.max_by_size([list(img.shape) for img in images])
+        max_size = self.max_by_axis([list(img.shape) for img in images])
         stride = float(size_divisible)
         max_size[1] = int(math.ceil(float(max_size[1]) / stride) * stride)
         max_size[2] = int(math.ceil(float(max_size[2]) / stride) * stride)
@@ -110,9 +110,9 @@ class GeneralizedRCNNTransform(nn.Module):
             images[i] = image
             if targets is not None and target_index is not None:
                 targets[i] = target_index
-        image_sizes = [img.shape[-2] for img in images]
+        image_sizes = [img.shape[-2:] for img in images]
         images = self.batch_images(images)
-        images_sizes_list = torch.jit.annotate(List(Tuple[int, int]), [])
+        images_sizes_list = torch.jit.annotate(List[Tuple[int, int]], [])
         for image_size in image_sizes:
             assert len(image_size) == 2
             images_sizes_list.append((image_size[0], image_size[1]))

@@ -1,8 +1,14 @@
-import torch, os
-import torchvision.transforms as transforms
-from my_dataset import VOC2012DataSet
+import os, sys
+sys.path.append(os.path.dirname(__file__))
+
+import torch
 import torchvision
 
+import transforms
+from network_files.faster_rcnn_framework import FasterRCNN, AnchorsGenerator
+from backbone.mobilenetv2_model import MobileNetV2
+from my_dataset import VOC2012DataSet
+from train_utils import train_eval_utils as utils
 
 def create_model(num_classes, weights_path):
     backbone = MobileNetV2(weights_path=weights_path).features
@@ -16,9 +22,9 @@ def create_model(num_classes, weights_path):
                                                     sampling_ratio=2)  # 采样率
 
     model = FasterRCNN(backbone=backbone,
-                       num_classes=num_classes,
-                       rpn_anchor_generator=anchor_generator,
-                       box_roi_pool=roi_pooler)
+                    num_classes=num_classes,
+                    rpn_anchor_generator=anchor_generator,
+                    box_roi_pool=roi_pooler)
 
     return model
 
@@ -29,7 +35,7 @@ def main():
     num_epochs = 20
     print("Using {} device training.".format(device.type))
 
-    weights_path = os.path.join(os.path.dirname(__file__), "backbone", "mobilenet_v2.pth")
+    weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "mobilenet_v2.pth")
     save_dir = os.path.join(os.path.dirname(__file__), "save_weights")
 
     if not os.path.exists("save_weights"):
@@ -92,7 +98,7 @@ def main():
                 "lr_scheduler": lr_scheduler.state_dict(),
                 "epoch": epoch
             }
-            torch.save(save_files, os.path.join(save_dir, "mobile-model-{}.pth".format(epoch)))
+            torch.save(save_files, os.path.join(save_dir, "fasterRCNN-mobileNet-{}.pth".format(epoch)))
 
 if __name__ == "__main__":
     main()
