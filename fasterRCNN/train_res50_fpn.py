@@ -68,7 +68,7 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='PyTorch FasterRCNN Training')
-    parser.add_argument('--batch_size', default=4, type=int, help='batch_size')
+    parser.add_argument('--batch_size', default=2, type=int, help='batch_size')
     parser.add_argument('--lr', default=0.005, type=float, help='learning rate')
     parser.add_argument('--num_epochs', default=20, type=int, help='number of epochs')
     parser.add_argument('--data_path', default=os.path.join(os.path.dirname(__file__), "..", "data", "VOC2012"), type=str, help='dataset path')
