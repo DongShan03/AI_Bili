@@ -174,12 +174,12 @@ class RegionProposalNetwork(nn.Module):
     def pre_nms_top_n(self):
         if self.training:
             return self._pre_nms_top_n['training']
-        return self._pre_nms_top_n['inference']
+        return self._pre_nms_top_n['testing']
 
     def post_nms_top_n(self):
         if self.training:
             return self._post_nms_top_n['training']
-        return self._post_nms_top_n['inference']
+        return self._post_nms_top_n['testing']
 
     def _get_top_n_idx(self, objectness, num_anchors_per_level):
         # type: (Tensor, List[int]) -> Tensor

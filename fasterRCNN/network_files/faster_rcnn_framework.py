@@ -27,7 +27,7 @@ class FasterRCNNBase(nn.Module):
             return losses
         return detections
 
-    def forward(self, images, targets):
+    def forward(self, images, targets=None):
          # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
         if self.training and targets is None:
             raise ValueError("In training mode, targets should be passed")

@@ -3,7 +3,7 @@ sys.path.append(os.path.dirname(__file__))
 
 import torch
 import torchvision
-
+from torchvision.models.feature_extraction import create_feature_extractor
 import transforms
 from network_files.faster_rcnn_framework import FasterRCNN, AnchorsGenerator
 from backbone.mobilenetv2_model import MobileNetV2
@@ -15,6 +15,8 @@ def create_model(num_classes, weights_path):
     # backbone = vgg(model_name="vgg16").features
     backbone = MobileNetV2(weights_path=weights_path).features
     backbone.out_channels = 1280  # 设置对应backbone输出特征矩阵的channels
+
+
 
     anchor_generator = AnchorsGenerator(sizes=((32, 64, 128, 256, 512),),
                                         aspect_ratios=((0.5, 1.0, 2.0),))
