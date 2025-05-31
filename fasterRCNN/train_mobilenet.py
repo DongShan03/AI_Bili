@@ -7,10 +7,12 @@ import torchvision
 import transforms
 from network_files.faster_rcnn_framework import FasterRCNN, AnchorsGenerator
 from backbone.mobilenetv2_model import MobileNetV2
+from backbone.vgg_model import vgg
 from my_dataset import VOC2012DataSet
 from train_utils import train_eval_utils as utils
 
 def create_model(num_classes, weights_path):
+    # backbone = vgg(model_name="vgg16").features
     backbone = MobileNetV2(weights_path=weights_path).features
     backbone.out_channels = 1280  # 设置对应backbone输出特征矩阵的channels
 

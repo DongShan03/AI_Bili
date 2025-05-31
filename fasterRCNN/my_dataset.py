@@ -116,7 +116,7 @@ class VOC2012DataSet(Dataset):
             ymin = float(obj["bndbox"]["ymin"])
             ymax = float(obj["bndbox"]["ymax"])
             boxes.append([xmin, ymin, xmax, ymax])
-            labels.append(self.class_dict[obj["name"]])
+            labels.append(self.class_indict[obj["name"]])
             iscrowd.append(int(obj["difficult"]))
 
         # convert everything into a torch.Tensor
