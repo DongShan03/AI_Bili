@@ -11,15 +11,9 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor, AnchorsGenerator
 from backbone.resnet50_fpn_model import resnet50_fpn_backbone
-
+from train_res50_fpn import create_model
 from draw_box_utils import draw_objs
 
-
-def create_model(num_classes):
-    backbone = resnet50_fpn_backbone(norm_layer=torch.nn.BatchNorm2d)
-    model = FasterRCNN(backbone=backbone, num_classes=num_classes)
-
-    return model
 
 
 def time_synchronized():
@@ -36,11 +30,11 @@ def main():
     model = create_model(num_classes=21)
 
     # load train weights
-    weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "fasterrcnn_resnet50_fpn.pth")
-    assert os.path.exists(weights_path), "{} file dose not exist.".format(weights_path)
-    weights_dict = torch.load(weights_path, map_location='cpu')
-    weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
-    model.load_state_dict(weights_dict)
+    # weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "fasterrcnn_resnet50_fpn.pth")
+    # assert os.path.exists(weights_path), "{} file dose not exist.".format(weights_path)
+    # weights_dict = torch.load(weights_path, map_location='cpu')
+    # weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
+    # model.load_state_dict(weights_dict)
     model.to(device)
 
     # read class_indict
@@ -53,7 +47,8 @@ def main():
 
     # load image
     img_name = "test1"
-    original_img = Image.open(os.path.dirname(__file__), "..", "data", "VOC2012", "test", img_name + ".jpg")
+    img_path = os.path.join(os.path.dirname(__file__), "..", "data", "VOC2012", "test", img_name + ".jpg")
+    original_img = Image.open(img_path).convert("RGB")
 
     # from pil image to tensor, do not normalize image
     data_transform = transforms.Compose([transforms.ToTensor()])
@@ -79,7 +74,6 @@ def main():
 
         if len(predict_boxes) == 0:
             print("没有检测到任何目标!")
-
         plot_img = draw_objs(original_img,
                             predict_boxes,
                             predict_classes,
@@ -92,7 +86,7 @@ def main():
         plt.imshow(plot_img)
         plt.show()
         # 保存预测的图片结果
-        plot_img.save(os.path.dirname(__file__), "..", "data", "VOC2012", "test", img_name + "_result.jpg")
+        plot_img.save(os.path.join(os.path.dirname(__file__), "..", "data", "VOC2012", "test", img_name + "_result.jpg"))
 
 
 if __name__ == '__main__':
