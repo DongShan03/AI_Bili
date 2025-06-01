@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description=__doc__)
-
+    save_path = os.path.join(os.path.dirname(__file__), "save_weights")
     # 训练设备类型
     parser.add_argument('--device', default='cuda:0', help='device')
     # 训练数据集的根目录(VOCdevkit)
@@ -211,9 +211,10 @@ if __name__ == "__main__":
     # 检测目标类别数(不包含背景)
     parser.add_argument('--num_classes', default=20, type=int, help='num_classes')
     # 文件保存地址
-    parser.add_argument('--save_path', default=os.path.join(os.path.dirname(__file__), "save_weights"), help='path where to save')
+    parser.add_argument('--save_path', default=save_path, help='path where to save')
     # 若需要接着上次训练，则指定上次训练保存权重文件地址
-    parser.add_argument('--resume', default='', type=str, help='resume from checkpoint')
+    # parser.add_argument('--resume', default=os.path.join(save_path, "resNetFpn-model-0.pth"), type=str, help='resume from checkpoint')
+    parser.add_argument('--resume', default="", type=str, help='resume from checkpoint')
     # 指定接着从哪个epoch数开始训练
     parser.add_argument('--start_epoch', default=0, type=int, help='start epoch')
     # 训练的总epoch数
