@@ -20,34 +20,34 @@ class IntermediateLayerGetter(nn.ModuleDict):
     be returned, but not `model.feature1.layer2`.
     Arguments:
         model (nn.Module): model on which we will extract the features
-        return_layers (Dict[name, new_name]): a dict containing the names
+        return_nodes (Dict[name, new_name]): a dict containing the names
             of the modules for which the activations will be returned as
             the key of the dict, and the value of the dict is the name
             of the returned activation (which the user can specify).
     """
     __annotations__ = {
-        "return_layers": Dict[str, str],
+        "return_nodes": Dict[str, str],
     }
 
-    def __init__(self, model, return_layers):
-        if not set(return_layers).issubset([name for name, _ in model.named_children()]):
-            raise ValueError("return_layers are not present in model")
+    def __init__(self, model, return_nodes):
+        if not set(return_nodes).issubset([name for name, _ in model.named_children()]):
+            raise ValueError("return_nodes are not present in model")
 
-        orig_return_layers = return_layers
-        return_layers = {str(k): str(v) for k, v in return_layers.items()}
+        orig_return_nodes = return_nodes
+        return_nodes = {str(k): str(v) for k, v in return_nodes.items()}
         layers = OrderedDict()
 
         # 遍历模型子模块按顺序存入有序字典
         # 只保存layer4及其之前的结构，舍去之后不用的结构
         for name, module in model.named_children():
             layers[name] = module
-            if name in return_layers:
-                del return_layers[name]
-            if not return_layers:
+            if name in return_nodes:
+                del return_nodes[name]
+            if not return_nodes:
                 break
 
         super().__init__(layers)
-        self.return_layers = orig_return_layers
+        self.return_nodes = orig_return_nodes
 
     def forward(self, x):
         out = OrderedDict()
@@ -55,8 +55,8 @@ class IntermediateLayerGetter(nn.ModuleDict):
         # 收集layer1, layer2, layer3, layer4的输出
         for name, module in self.items():
             x = module(x)
-            if name in self.return_layers:
-                out_name = self.return_layers[name]
+            if name in self.return_nodes:
+                out_name = self.return_nodes[name]
                 out[out_name] = x
         return out
 
@@ -187,11 +187,11 @@ class BackboneWithFPN(nn.Module):
     """
     Adds a FPN on top of a model.
     Internally, it uses torchvision.models._utils.IntermediateLayerGetter to
-    extract a submodel that returns the feature maps specified in return_layers.
+    extract a submodel that returns the feature maps specified in return_nodes.
     The same limitations of IntermediatLayerGetter apply here.
     Arguments:
         backbone (nn.Module)
-        return_layers (Dict[name, new_name]): a dict containing the names
+        return_nodes (Dict[name, new_name]): a dict containing the names
             of the modules for which the activations will be returned as
             the key of the dict, and the value of the dict is the name
             of the returned activation (which the user can specify).
@@ -205,7 +205,7 @@ class BackboneWithFPN(nn.Module):
 
     def __init__(self,
                  backbone: nn.Module,
-                 return_layers=None,
+                 return_nodes=None,
                  in_channels_list=None,
                  out_channels=256,
                  extra_blocks=None,
@@ -216,8 +216,8 @@ class BackboneWithFPN(nn.Module):
             extra_blocks = LastLevelMaxPool()
 
         if re_getter is True:
-            assert return_layers is not None
-            self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
+            assert return_nodes is not None
+            self.body = IntermediateLayerGetter(backbone, return_nodes=return_nodes)
         else:
             self.body = backbone
 

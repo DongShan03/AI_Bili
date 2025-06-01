@@ -140,11 +140,17 @@ class BoxCoder(object):
     def decode(self, rel_codes, boxes):
         assert isinstance(boxes, (list, tuple))
         assert isinstance(rel_codes, Tensor)
+        boxes_per_image = [b.size(0) for b in boxes]
         concat_boxes = torch.cat(boxes, dim=0)
-
+        box_sum = 0
+        for val in boxes_per_image:
+            box_sum += val
         box_sum = concat_boxes.shape[0]
-        pred_boxes = self.decode_single(rel_codes.reshape(box_sum, -1), concat_boxes)
-        return pred_boxes.reshape(box_sum, -1, 4)
+        pred_boxes = self.decode_single(rel_codes, concat_boxes)
+        # 防止pred_boxes为空时导致reshape报错
+        if box_sum > 0:
+            pred_boxes = pred_boxes.reshape(box_sum, -1, 4)
+        return pred_boxes
 
     def decode_single(self, rel_codes, boxes):
         boxes = boxes.to(rel_codes.dtype)
