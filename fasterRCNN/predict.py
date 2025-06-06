@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor, AnchorsGenerator
 from backbone.resnet50_fpn_model import resnet50_fpn_backbone
-from train_res50_fpn import create_model
+from change_backbone_with_fpn import create_model
 from draw_box_utils import draw_objs
 
 
@@ -30,11 +30,11 @@ def main():
     model = create_model(num_classes=21)
 
     # load train weights
-    # weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "fasterrcnn_resnet50_fpn.pth")
-    # assert os.path.exists(weights_path), "{} file dose not exist.".format(weights_path)
-    # weights_dict = torch.load(weights_path, map_location='cpu')
-    # weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
-    # model.load_state_dict(weights_dict)
+    weights_path = os.path.join(os.path.dirname(__file__), "save_weights", "resNetFpn-model-2.pth")
+    assert os.path.exists(weights_path), "{} file dose not exist.".format(weights_path)
+    weights_dict = torch.load(weights_path, map_location='cpu')
+    weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
+    model.load_state_dict(weights_dict)
     model.to(device)
 
     # read class_indict
