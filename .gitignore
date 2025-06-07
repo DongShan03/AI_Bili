@@ -175,6 +175,7 @@ cython_debug/
 
 # pytroch pth
 *.pth
+*.pt
 
 # class json
 class_*.json
