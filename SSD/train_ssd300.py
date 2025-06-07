@@ -69,7 +69,7 @@ def main():
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=cfg["lr"], momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.3)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
 
     if cfg["resume"] != "":
         checkpoint = torch.load(cfg["resume"], map_location="cpu")
