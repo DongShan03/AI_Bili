@@ -24,8 +24,7 @@ def main():
     model = cfg["model"]
 
     #* 加载模型权重
-    weights_path = os.path.join(cfg["save_path"], cfg["weights"])
-    weights_dict = torch.load(weights_path, map_location='cpu')
+    weights_dict = torch.load(cfg["weights"], map_location='cpu')
     weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
     model.load_state_dict(weights_dict)
     model.to(device)

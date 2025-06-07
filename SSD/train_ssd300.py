@@ -74,8 +74,11 @@ def main():
     if cfg["resume"] != "":
         checkpoint = torch.load(cfg["resume"], map_location="cpu")
         model.load_state_dict(checkpoint["model"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+
+        #? 如果学习率太低就将这两行注释掉
+        # optimizer.load_state_dict(checkpoint["optimizer"])
+        # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+
         cfg["start_epoch"] = checkpoint["epoch"] + 1
         print("the training process from epoch{}...".format(cfg["start_epoch"]))
 
@@ -114,7 +117,7 @@ def main():
             'optimizer': optimizer.state_dict(),
             'lr_scheduler': lr_scheduler.state_dict(),
             'epoch': epoch}
-        torch.save(save_files, os.path.join(cfg["save_path"], "ssd300-{}.pth".format(epoch)))
+        torch.save(save_files, os.path.join(cfg["save_path"], cfg["save_name"] + f"-{epoch}.pth"))
 
 
 if __name__ == "__main__":
