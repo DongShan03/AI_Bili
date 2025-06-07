@@ -56,4 +56,4 @@ def cfg_update():
 cfg_update()
 
 if __name__ == "__main__":
-    print(cfg["resume"])
+    print(cfg["weights"])
