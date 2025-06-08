@@ -43,7 +43,7 @@ def main():
     img_name = random.choice(imgs_name)
     dst_path = os.path.join(cfg["data_root"], "test")
     src = os.path.join(src_path, img_name)
-    result = os.path.join(dst_path, img_name.split(".")[0] + "_result.jpg")
+    result = os.path.join(dst_path, img_name.split(".")[0] + "_" + cfg["save_name"] + "_result.jpg")
     if not os.path.exists(src):
         raise FileExistsError("{} is not exist".format(src))
 

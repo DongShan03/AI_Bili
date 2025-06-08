@@ -6,9 +6,9 @@ from backbone.ssd_model import backBone, SSD300
 from my_dataset import VOCDataset
 
 cfg = {
-    "epochs": 50,
+    "epochs": 130,
     "batch_size": 24,
-    "lr": 0.0005,
+    "lr": 0.0008,
     "num_classes": 20,
     "transform": get_data_transform(),
     "device": torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
