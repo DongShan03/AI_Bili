@@ -185,4 +185,6 @@ class_*.json
 *runs*/
 
 # data_image
-data/
+COCO2017/
+VOC2012/
+yolo_data_VOC2012/

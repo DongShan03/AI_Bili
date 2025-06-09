@@ -3,7 +3,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 import json, os
 import torch
-from cfg import *
+from cfg import cfg
 
 def get_pic():
     data_transform = transforms.Compose([
@@ -13,7 +13,7 @@ def get_pic():
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
 
-    img_path = os.path.join(dir_root, "test1.jpg")
+    img_path = os.path.join(cfg['dir_root'], "test1.jpg")
     img = Image.open(img_path)
     img = data_transform(img)
     img = torch.unsqueeze(img, dim=0)
@@ -21,14 +21,14 @@ def get_pic():
 
 def main():
     try:
-        json_file = open(class_indices, "r")
+        json_file = open(cfg['class_indices'], "r")
         class_indict = json.load(json_file)
     except Exception as e:
-        raise FileExistsError("{} is not exist".format(class_indices))
-    net.load_state_dict(torch.load(save_path))
-    net.eval()
+        raise FileExistsError("{} is not exist".format(cfg['class_indices']))
+    cfg["net"].load_state_dict(torch.load(cfg['save_path']))
+    cfg["net"].eval()
     with torch.no_grad():
-        output = torch.squeeze(net(get_pic()))
+        output = torch.squeeze(cfg["net"](get_pic()))
         predict = torch.softmax(output, dim=0)
         predict_cla = torch.argmax(predict).numpy()
     print("This pic should be: {}, and the probability is {:.3f}".format(class_indict[str(predict_cla)], predict[predict_cla].item()))
