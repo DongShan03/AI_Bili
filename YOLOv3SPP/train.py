@@ -19,7 +19,7 @@ def train():
     imgsz_test = cfg["img_size"]
     multi_scale = cfg["muliti_scale"]
     hyp = cfg["hyp"]
-    tb_writer = SummaryWriter(log_dir=os.path.join(cfg["file_dir"], "log")),
+    tb_writer = SummaryWriter(log_dir=os.path.join(cfg["file_dir"], "log"))
 
     results_file = cfg["save_name"] + "_results.txt"
     results_file = os.path.join(cfg["save_path"], results_file)
