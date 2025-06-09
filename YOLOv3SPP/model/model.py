@@ -1,7 +1,7 @@
 import os, sys, math
 project_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(project_dir)
-from utils.parse_config import parse_model_cfg
+sys.path.append(os.path.dirname(project_dir))
+from YOLOv3SPP.utils.parse_config import parse_model_cfg
 import torch
 import torch.nn as nn
 
@@ -204,7 +204,7 @@ class Yolov3SPP(nn.Module):
         self.model_cfg = parse_model_cfg(cfg_path)
         #! 这里原先是img_size,改为input_size
         self.module_list, self.routes = create_modules(self.model_cfg, self.input_size)
-        self.yolo_layer = get_yolo_layers(self)
+        self.yolo_layers = get_yolo_layers(self)
 
     def forward(self, x, verbose=False):
         return self.forward_once(x, verbose)

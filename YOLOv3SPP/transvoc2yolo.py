@@ -14,6 +14,7 @@ import shutil
 VOC_ROOT = os.path.join(os.path.dirname(__file__), "..", "data", "VOC2012")
 save_file_root = os.path.join(os.path.dirname(__file__), "..", "data", "yolo_data_VOC2012")
 label_json_path = os.path.join(VOC_ROOT, "pascal_voc_classes.json")
+label_to_json_path = os.path.join(save_file_root, "pascal_voc_classes.json")
 
 voc_images_path = os.path.join(VOC_ROOT, "JPEGImages")
 voc_xml_path = os.path.join(VOC_ROOT, "Annotations")
@@ -119,6 +120,7 @@ def create_class_names(class_dict: dict):
 def main():
     json_file = open(label_json_path, "r")
     class_dict = json.load(json_file)
+    shutil.copyfile(label_json_path, label_to_json_path)
 
     with open(train_txt_path, "r") as r:
         train_file_names = [i for i in r.read().splitlines() if len(i.strip()) > 0]
