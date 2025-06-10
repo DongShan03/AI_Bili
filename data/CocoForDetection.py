@@ -70,8 +70,6 @@ class CocoDetection(data.Dataset):
         if os.path.exists(self.coco_incides):
             with open(self.coco_incides, "r") as f:
                 coco_classes = json.load(f)
-            print("load coco91_indices.json")
-            print(coco_classes)
         else:
             coco_classes = {}
             data_classes = dict([(v["id"], v["name"]) for k, v in self.coco.cats.items()])

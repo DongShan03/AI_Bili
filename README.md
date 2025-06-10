@@ -48,4 +48,4 @@ one_stage: YOLOv3SPP, SSD, RetinaNet
 
 ### RetinaNet
 
-与fasterRCnn相似但采用的特征层不同
+与fasterRCnn相似但采用的特征层不同,retinaNet的预测器的权值是共享的

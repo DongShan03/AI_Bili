@@ -17,12 +17,6 @@ cfg = {
 cfg.update({
     "device": torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
     "file_dir": os.path.dirname(__file__),
-    "img_size": 512,
-    "amp": True,
-    "rect": True,
-    "cache_images": False,
-    "notest": False,
-    "savebest": False,
 })
 
 cfg.update({
