@@ -34,7 +34,7 @@ GN 的计算与批量大小无关，其精度也在各种批量大小下保持�
 
 ### tensorboard
 
-运行命令：tensorboard --logdir  dir_log_path
+运行命令：tensorboard --logdir dir_log_path
 
 ### 图像分类模型
 
@@ -42,4 +42,10 @@ GN 的计算与批量大小无关，其精度也在各种批量大小下保持�
 
 ### 图像目标检测
 
-包含: fasterRCNN
+two_stage: fasterRCNN
+
+one_stage: YOLOv3SPP, SSD, RetinaNet
+
+### RetinaNet
+
+与fasterRCnn相似但采用的特征层不同
