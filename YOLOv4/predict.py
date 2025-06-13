@@ -34,7 +34,7 @@ def main():
 
     input_size = (img_size, img_size)
     device = opt.device
-    model = Darknet(cfg=opt.cfg, input_size=input_size)
+    model = Darknet(cfg=opt.cfg, img_size=input_size)
     weights_dict = torch.load(weights_path, map_location='cpu')
     weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
     model.load_state_dict(weights_dict)

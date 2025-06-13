@@ -7,11 +7,11 @@ import torch, yaml
 
 class OPT:
     def __init__(self):
-        self.epochs = 30
+        self.epochs = 50
         self.batch_size = 8
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov4"
+        self.save_name = "yolov4-pacsp-s"
 
         self.img_size = 512
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -75,5 +75,4 @@ class OPT:
 opt = OPT()
 
 if __name__ == "__main__":
-    ckpt = torch.load(opt.resume, map_location=opt.device, weights_only=False)
-    print(ckpt.keys())
+    print(opt.resume)

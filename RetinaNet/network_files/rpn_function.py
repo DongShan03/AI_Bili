@@ -68,7 +68,7 @@ class AnchorsGenerator(nn.Module):
             shifts_x = torch.arange(0, grid_width, dtype=torch.float32, device=device) * stride_width
             shifts_y = torch.arange(0, grid_height, dtype=torch.float32, device=device) * stride_height
 
-            shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x)
+            shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x, indexing='ij')
             shift_x = shift_x.reshape(-1)
             shift_y = shift_y.reshape(-1)
 

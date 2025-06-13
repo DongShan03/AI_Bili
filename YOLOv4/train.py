@@ -1,4 +1,4 @@
-import sys, os, math
+import sys, os, math, warnings
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from YOLOv4.opt import opt
 from YOLOv4.model.model import Darknet, YOLOLayer, JDELayer
@@ -12,6 +12,16 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tensorboardX import SummaryWriter
+
+warnings.filterwarnings('ignore')
+
+def get_scheduler(hyp, epochs, optimizer, start_epoch=0, state_dict=None):
+    lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - hyp['lrf']) + hyp['lrf']  # cosine
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    if state_dict:
+        scheduler.load_state_dict(state_dict)
+    scheduler.last_epoch = start_epoch
+    return scheduler
 
 def train():
     device = opt.device
@@ -65,6 +75,9 @@ def train():
     optimizer = torch.optim.SGD(pg, lr=hyp["lr0"], momentum=hyp["momentum"],
                                 weight_decay=hyp["weight_decay"], nesterov=True)
     scaler = torch.GradScaler("cuda") if device.type == "cuda" else None
+
+
+
     epochs = opt.epochs
     start_epoch = 0
     best_map = 0.0
@@ -95,16 +108,17 @@ def train():
         if ckpt.get("epoch", None) is not None:
             start_epoch = ckpt["epoch"] + 1
 
+        scheduler = get_scheduler(hyp, optimizer=optimizer, epochs=epochs, start_epoch=start_epoch, state_dict=ckpt.get("scheduler", None))
+
         if opt.epochs < start_epoch:
-            epochs += ckpt['epoch']
+            epochs = start_epoch + 10
 
         if opt.amp and "scaler" in ckpt:
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
 
-    lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - hyp['lrf']) + hyp['lrf']  # cosine
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    scheduler.last_epoch = start_epoch
+    else:
+        scheduler = get_scheduler(hyp, optimizer=optimizer, epochs=epochs, start_epoch=start_epoch)
 
     train_dataset = LoadImagesAndLabels(
         train_path, imgsz_train, opt.batch_size, augment=True,
@@ -186,6 +200,7 @@ def train():
                         save_files = {
                             'model': model.state_dict(),
                             'optimizer': optimizer.state_dict(),
+                            "scheduler": scheduler.state_dict(),
                             'training_results': f.read(),
                             'epoch': epoch,
                             'best_map': best_map}
@@ -198,6 +213,7 @@ def train():
                             save_files = {
                                 'model': model.state_dict(),
                                 'optimizer': optimizer.state_dict(),
+                                "scheduler": scheduler.state_dict(),
                                 'training_results': f.read(),
                                 'epoch': epoch,
                                 'best_map': best_map}

@@ -153,7 +153,7 @@ def compute_loss(p, targets, model):
 
         lobj += BCEobj(pi[..., 4], tobj) * balance[i]  #* obj loss
 
-    s = 3 / no
+    s = 9 / no
     lbox *= h["box"] * s
     lobj *= h["obj"] * s * (1.4 if no >= 4 else 1.)
     lcls *= h["cls"] * s
