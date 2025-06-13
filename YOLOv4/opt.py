@@ -11,7 +11,7 @@ class OPT:
         self.batch_size = 8
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov4-pacsp-s"
+        self.save_name = "yolov4"
 
         self.img_size = 512
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -52,7 +52,7 @@ class OPT:
             files = os.listdir(self.save_path)
             for file in files:
                 if file.endswith(".pth") & file.startswith(self.save_name):
-                    nums.append(int(file.split('-')[1].split('.')[0]))
+                    nums.append(int(file.split('-')[-1].split('.')[0]))
 
         #! 如果没有训练过，resume和weights都为空
         #! 这里默认resume和weights都使用save_path下最新的模型

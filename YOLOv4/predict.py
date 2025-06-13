@@ -15,6 +15,43 @@ from YOLOv4.utils.draw_box_utils import draw_objs
 from YOLOv4.opt import opt
 
 
+def predict(img_o, input_size, model, device, category_index, logging_info=True):
+    img = letterbox(img_o, new_shape=input_size, auto=True)[0]
+
+    img = img[:, :, ::-1].transpose(2, 0, 1)
+    img = np.ascontiguousarray(img)
+
+    img = torch.from_numpy(img).to(device).float()
+    img /= 255.0
+    img = img.unsqueeze(0)
+
+    t1 = utils.time_synchronized()
+    pred = model(img)[0]
+    t2 = utils.time_synchronized()
+    if logging_info:
+        print("inference time: {:.4f}s".format(t2 - t1))
+
+    pred = utils.non_max_suppression(pred, conf_thres=0.1, iou_thres=0.6, multi_label=True)[0]
+    t3 = utils.time_synchronized()
+    if logging_info:
+        print("nms time: {:.4f}s".format(t3 - t2))
+
+    if pred is None:
+        return None
+
+    pred[:, :4] = utils.scale_coords(img.shape[2:], pred[:, :4], img_o.shape).round()
+    bboxes = pred[:, :4].detach().cpu().numpy()
+    scores = pred[:, 4].detach().cpu().numpy()
+    classes = pred[:, 5].detach().cpu().numpy().astype(np.int16) + 1
+
+    pil_img = Image.fromarray(img_o[:, :, ::-1])
+    plot_img = draw_objs(pil_img, bboxes, classes, scores,
+                        category_index=category_index,
+                        box_thresh=0.2, line_thickness=3,
+                        font='arial.ttf', font_size=20)
+    return plot_img
+
+
 def main():
     img_size = opt.img_size
     weights_path = opt.weights
@@ -47,39 +84,11 @@ def main():
 
         img_o = cv2.imread(src)
         assert img_o is not None, "Image Not Found " + src
-        img = letterbox(img_o, new_shape=input_size, auto=True)[0]
+        plot_img = predict(img_o, input_size, model, device, category_index)
 
-        img = img[:, :, ::-1].transpose(2, 0, 1)
-        img = np.ascontiguousarray(img)
-
-        img = torch.from_numpy(img).to(device).float()
-        img /= 255.0
-        img = img.unsqueeze(0)
-
-        t1 = utils.time_synchronized()
-        pred = model(img)[0]
-        t2 = utils.time_synchronized()
-        print("inference time: {:.4f}s".format(t2 - t1))
-
-        pred = utils.non_max_suppression(pred, conf_thres=0.1, iou_thres=0.6, multi_label=True)[0]
-        t3 = utils.time_synchronized()
-        print("nms time: {:.4f}s".format(t3 - t2))
-
-        if pred is None:
+        if plot_img is None:
             print("No target detected.")
             exit(0)
-
-        pred[:, :4] = utils.scale_coords(img.shape[2:], pred[:, :4], img_o.shape).round()
-        bboxes = pred[:, :4].detach().cpu().numpy()
-        scores = pred[:, 4].detach().cpu().numpy()
-        classes = pred[:, 5].detach().cpu().numpy().astype(np.int16) + 1
-
-        pil_img = Image.fromarray(img_o[:, :, ::-1])
-        plot_img = draw_objs(pil_img, bboxes, classes, scores,
-                            category_index=category_index,
-                            box_thresh=0.2, line_thickness=3,
-                            font='arial.ttf', font_size=20)
-
         plt.imshow(plot_img)
         plt.show()
         plot_img.save(result)

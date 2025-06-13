@@ -57,11 +57,11 @@ def draw_text(draw,
     display_str_height = (1 + 2 * 0.05) * max(display_str_heights)
 
     if top > display_str_height:
-        text_top = top - display_str_height
-        text_bottom = top
+        text_top = top
+        text_bottom = top + display_str_height
     else:
-        text_top = bottom
-        text_bottom = bottom + display_str_height
+        text_top = bottom - display_str_height
+        text_bottom = bottom
 
     for ds in display_str:
         _, _, text_width, text_height = font.getbbox(ds)
