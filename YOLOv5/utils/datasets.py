@@ -7,21 +7,14 @@ from YOLOv5.utils.distributed_utils import torch_distributed_zero_first
 import contextlib
 import glob
 import hashlib
-import json
-import math
 import random
-import shutil
-import time
-from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
-from threading import Thread
 import numpy as np
 import psutil
 import torch
 import torch.nn.functional as F
 import torchvision
-import yaml
 import cv2
 from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
@@ -78,7 +71,7 @@ def seed_worker(worker_id):
 
 def img2label_paths(img_paths):
     sa, sb = f"{os.sep}images{os.sep}", f"{os.sep}labels{os.sep}"  # /images/, /labels/ substrings
-    return [sb.join(x.rsplit(sa, 1)).rsplit(".", 1)[0] + ".txt" for x in img_paths]
+    return [x.replace(sa, sb, 1).replace(x.split(".")[-1], "txt") for x in img_paths]
 
 class  _RepeatSampler(object):
     def __init__(self, sampler):
@@ -90,7 +83,7 @@ class  _RepeatSampler(object):
 
 class InfiniteDataLoader(torch.utils.data.dataloader.DataLoader):
     def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         object.__setattr__(self, 'batch_sampler',  _RepeatSampler(self.batch_sampler))
         self.iterator = super().__iter__()
 
@@ -107,7 +100,7 @@ class LoadImagesAndLabels(Dataset):
 
     def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None,
                 rect=False, image_weights=False, cache_images=False, single_cls=False,
-                stride=32, pad=0.0, min_items=0, prefix="", rank=-1, seed=0):
+                stride=32, pad=0.0, min_items=0, rank=-1, seed=0):
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -139,15 +132,15 @@ class LoadImagesAndLabels(Dataset):
         self.label_files = img2label_paths(self.img_files)
         cache_path = str(Path(self.label_files[0]).parent) + '.cache5'
         if os.path.isfile(cache_path):
-            cache, exists = np.load(cache_path, allow_pickle=True).item(), True  # load dict
-            assert cache["version"] == self.cache_version  # matches current version
-            assert cache["hash"] == get_hash(self.label_files + self.img_files)  # identical hash
+            cache = torch.load(cache_path, weights_only=False) # load dict
+            if cache["version"] != self.cache_version or cache["hash"] != get_hash(self.label_files + self.img_files):
+                cache = self.cache_labels(cache_path)
         else:
-            cache, exists = self.cache_labels(cache_path), False  # run cache ops
+            cache = self.cache_labels(cache_path)
 
         nf, nm, ne, nc, n = cache.pop("result")
-        if exists and rank in [-1, 0]:
-            d = f"Scanning {cache_path}... {nf} images, {nm + ne} backgrounds, {nc} corrupt"
+        if rank in [-1, 0]:
+            d = f"Scanning {os.sep.join(cache_path.split(os.sep)[-2:])}... {nf} images, {nm + ne} backgrounds, {nc} corrupt"
             tqdm(None, desc=d, total=n, initial=n)  # display cache results
         assert nf > 0 or not augment, f"No labels found in {cache_path}, can not start training."
         [cache.pop(k) for k in ("hash", "version")]
@@ -168,7 +161,7 @@ class LoadImagesAndLabels(Dataset):
             self.shapes = self.shapes[include]
 
         n = len(self.shapes)
-        bi = np.floor(np.arange(n) / batch_size).astype(np.int)  # batch index
+        bi = np.floor(np.arange(n) / batch_size).astype(np.int32)  # batch index
         nb = bi[-1] + 1  # number of batches
         self.batch = bi  # batch index of image
         self.n = n
@@ -218,17 +211,15 @@ class LoadImagesAndLabels(Dataset):
         if cache_images:
             gb = 0  # Gigabytes of cached images
             self.img_hw0, self.img_hw = [None] * n, [None] * n
-            with ThreadPool(16) as pool:
-                results = pool.imap(lambda i: (i, self.load_image(i)), self.indices)
-                pbar = tqdm(results, total=n)
-                for i, x in enumerate(pbar):
-                    self.imgs[i], self.img_hw0[i], self.img_hw[i] = x
-                    gb += self.imgs[i].nbytes
-                    if rank in [-1, 0]:
-                        pbar.desc = "Loading images into memory %g/%g (%.1fGB)" % (i + 1, n, gb / 1E9)
-                pbar.close()
+            results = ThreadPool(8).imap(lambda i: (i, self.load_image(i)), self.indices)
+            pbar = tqdm(enumerate(results), total=n)
+            for i, x in pbar:
+                self.imgs[i], self.img_hw0[i], self.img_hw[i] = x
+                gb += self.imgs[i].nbytes
+                if rank in [-1, 0]:
+                    pbar.desc = "Loading images into memory %g/%g (%.1fGB)" % (i + 1, n, gb / 1E9)
 
-    def check_cache_ram(self, safety_margin=0.1, prefix=""):
+    def check_cache_ram(self, safety_margin=0.1):
         #* 检查内存是否足够放下所有图像
         b = 0
         n = min(self.n, 30)
@@ -245,7 +236,8 @@ class LoadImagesAndLabels(Dataset):
     def cache_labels(self, cache_path='labels.cache5'):
         x = {}
         nm, nf, ne, nc = 0, 0, 0, 0
-        desc = f"Scanning {cache_path.parent / cache_path.stem}..."
+        cache_path = Path(cache_path)
+        desc = f"Scanning {os.sep.join(str(cache_path.absolute()).split(os.sep)[-2:])}..."
         with Pool(16) as pool:
             pbar = tqdm(
                 pool.imap(verify_image_label, zip(self.img_files, self.label_files)),
@@ -261,16 +253,11 @@ class LoadImagesAndLabels(Dataset):
                     x[img_file] = [lb, shape, segment]
                 x[img_file] = [lb, shape, segment]
                 pbar.desc = f"{desc} {nf} images, {nm + ne} backgrounds, {nc} corrupt"
-        pbar.close()
+            pbar.close()
         x["hash"] = get_hash(self.label_files + self.img_files)
         x["result"] = nf, nm, ne, nc, len(self.img_files)
         x["version"] = self.cache_version
-        try:
-            np.save(cache_path, x)
-            cache_path.with_suffix(".cache.npy").rename(cache_path)  # remove .npy suffix
-        except Exception as e:
-            print(f'WARNING: Cache directory {cache_path.parent} is not writeable: {e}')
-            exit(-1)
+        torch.save(x, str(cache_path))
         return x
 
     def __len__(self):
@@ -285,7 +272,9 @@ class LoadImagesAndLabels(Dataset):
             shapes = None
 
             if random.random() < hyp["mixup"]:
-                img2, labels2 = mixup(img, labels, *load_mosaic(self, random.choice(self.indices)))
+                num2 = random.randint(0, len(self.indices) - 1)
+                img2, label2 = load_mosaic(self, num2)
+                img, labels = mixup(img, labels, img2, label2)
         else:
             img, (h0, w0), (h, w) = load_image(self, index)
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
@@ -420,65 +409,79 @@ def verify_image_label(args):
         return None, None, None, None, nm, nf, ne, nc
 
 def load_mosaic(self, index):
-    #* 将四张图片拼接在一张马赛克图像中
-    label4 = []
+    """Loads a 4-image mosaic for YOLOv5, combining 1 selected and 3 random images, with labels and segments."""
+    labels4, segments4 = [], []
     s = self.img_size
+    yc, xc = (int(random.uniform(-x, 2 * s + x)) for x in self.mosaic_border)  # mosaic center x, y
+    indices = [index] + random.choices(self.indices, k=3)  # 3 additional image indices
+    random.shuffle(indices)
+    for i, index in enumerate(indices):
+        # Load image
+        img, _, (h, w) = load_image(self, index)
 
-    xc ,yc = [int(random.uniform(s * 0.5, s * 1.5)) for _ in range(2)]  # mosaic center x, y
-    #* 获取另外三张照片的索引
-    indices = [index] + [random.randint(0, len(self.labels) - 1) for _ in range(3)]
-    for i in indices:
-        img, _, h, w = load_image(self, i)
-        if i == 0:
+        # place img in img4
+        if i == 0:  # top left
             img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
-            #* 第一张图片在右下角对其xc yc后其在img4中左上角的位置（可能有裁剪）
-            x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc
-            #* 第一张照片所取到的部分在原图上的位置
-            x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h
-        elif i == 1: #! 右上角
+            x1a, y1a, x2a, y2a = max(xc - w, 0), max(yc - h, 0), xc, yc  # xmin, ymin, xmax, ymax (large image)
+            x1b, y1b, x2b, y2b = w - (x2a - x1a), h - (y2a - y1a), w, h  # xmin, ymin, xmax, ymax (small image)
+        elif i == 1:  # top right
             x1a, y1a, x2a, y2a = xc, max(yc - h, 0), min(xc + w, s * 2), yc
             x1b, y1b, x2b, y2b = 0, h - (y2a - y1a), min(w, x2a - x1a), h
-        elif i == 2: #! 左下角
+        elif i == 2:  # bottom left
             x1a, y1a, x2a, y2a = max(xc - w, 0), yc, xc, min(s * 2, yc + h)
-            x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, max(xc, w), min(y2a - y1a, h)
-        elif i == 3: #! 右下角
+            x1b, y1b, x2b, y2b = w - (x2a - x1a), 0, w, min(y2a - y1a, h)
+        elif i == 3:  # bottom right
             x1a, y1a, x2a, y2a = xc, yc, min(xc + w, s * 2), min(s * 2, yc + h)
             x1b, y1b, x2b, y2b = 0, 0, min(w, x2a - x1a), min(y2a - y1a, h)
+
         img4[y1a:y2a, x1a:x2a] = img[y1b:y2b, x1b:x2b]  # img4[ymin:ymax, xmin:xmax]
-        #* 计算pad 也就是图像的左上角的相对偏移， 用于计算label
         padw = x1a - x1b
         padh = y1a - y1b
 
-        x = self.labels[index]
-        labels = x.copy()
-        if x.size > 0:
-            #* 将bbox的坐标转换到新的图像上 同时坐标体系由(cx, cy, w, h) -> (xmin, ymin, xmax, ymax)
-            labels[:, 1] = w * (x[:, 1] - x[:, 3] / 2) + padw
-            labels[:, 2] = h * (x[:, 2] - x[:, 4] / 2) + padh
-            labels[:, 3] = w * (x[:, 1] + x[:, 3] / 2) + padw
-            labels[:, 4] = h * (x[:, 2] + x[:, 4] / 2) + padh
+        # Labels
+        labels, segments = self.labels[index].copy(), self.segments[index].copy()
+        if labels.size:
+            labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padw, padh)  # normalized xywh to pixel xyxy format
+            segments = [xyn2xy(x, w, h, padw, padh) for x in segments]
+        labels4.append(labels)
+        segments4.extend(segments)
 
-        label4.append(labels)
+    # Concat/clip labels
+    labels4 = np.concatenate(labels4, 0)
+    for x in (labels4[:, 1:], *segments4):
+        np.clip(x, 0, 2 * s, out=x)  # clip when using random_perspective()
+    img4, labels4 = replicate(img4, labels4)  # replicate
 
-    if len(label4):
-        label4 = np.concatenate(label4, 0)
-        np.clip(labels[:, 1:], 0, 2 * s, out=labels[:, 1:])
+    # Augment
+    img4, labels4, segments4 = copy_paste(img4, labels4, segments4, p=self.hyp["copy_paste"])
+    img4, labels4 = random_perspective(
+        img4,
+        labels4,
+        segments4,
+        degrees=self.hyp["degrees"],
+        translate=self.hyp["translate"],
+        scale=self.hyp["scale"],
+        shear=self.hyp["shear"],
+        perspective=self.hyp["perspective"],
+        border=self.mosaic_border,
+    )  # border to remove
 
-    img4, label4 = random_perspective(img4, label4, degrees=self.hyp["degrees"],
-                                translate=self.hyp["translate"],
-                                scale=self.hyp["scale"],
-                                shear=self.hyp["shear"],
-                                border=-s//2)
-
-    return img4, label4
+    return img4, labels4
 
 def load_mosaic9(self, index):
-    labels9 = []
+    """Loads 1 image + 8 random images into a 9-image mosaic for augmented YOLOv5 training, returning labels and
+    segments.
+    """
+    labels9, segments9 = [], []
     s = self.img_size
-    indices = [index] + [random.randint(0, len(self.labels) - 1) for _ in range(8)]
+    indices = [index] + random.choices(self.indices, k=8)  # 8 additional image indices
+    random.shuffle(indices)
+    hp, wp = -1, -1  # height, width previous
     for i, index in enumerate(indices):
+        # Load image
         img, _, (h, w) = load_image(self, index)
 
+        # place img in img9
         if i == 0:  # center
             img9 = np.full((s * 3, s * 3, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
             h0, w0 = h, w
@@ -501,38 +504,48 @@ def load_mosaic9(self, index):
             c = s - w, s + h0 - hp - h, s, s + h0 - hp
 
         padx, pady = c[:2]
-        x1, y1, x2, y2 = [max(x, 0) for x in c]
+        x1, y1, x2, y2 = (max(x, 0) for x in c)  # allocate coords
 
-        x = self.labels[index]
-        labels = x.copy()
-        if x.size > 0:
-            labels[:, 1] = w * (x[:, 1] - x[:, 3] / 2) + padx
-            labels[:, 2] = h * (x[:, 2] - x[:, 4] / 2) + pady
-            labels[:, 3] = w * (x[:, 1] + x[:, 3] / 2) + padx
-            labels[:, 4] = h * (x[:, 2] + x[:, 4] / 2) + pady
+        # Labels
+        labels, segments = self.labels[index].copy(), self.segments[index].copy()
+        if labels.size:
+            labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padx, pady)  # normalized xywh to pixel xyxy format
+            segments = [xyn2xy(x, w, h, padx, pady) for x in segments]
         labels9.append(labels)
+        segments9.extend(segments)
 
-        img9[y1:y2, x1:x2] = img[y1 - pady:, x1 - padx:]
-        hp, wp = h, w    #* height, width previous
+        # Image
+        img9[y1:y2, x1:x2] = img[y1 - pady :, x1 - padx :]  # img9[ymin:ymax, xmin:xmax]
+        hp, wp = h, w  # height, width previous
 
-    yc, xc = [int(random.uniform(0, s)) for x in self.mosaic_border]  # mosaic center x, y
-    #* 将原先的3s * 3s的图像裁剪成2s * 2s
-    img9 = img9[yc:yc + 2 * s, xc:xc + 2 * s]
+    # Offset
+    yc, xc = (int(random.uniform(0, s)) for _ in self.mosaic_border)  # mosaic center x, y
+    img9 = img9[yc : yc + 2 * s, xc : xc + 2 * s]
 
-    if len(labels9):
-        labels9 = np.concatenate(labels9, 0)
-        labels9[:, [1, 3]] -= xc
-        labels9[:, [2, 4]] -= yc
+    # Concat/clip labels
+    labels9 = np.concatenate(labels9, 0)
+    labels9[:, [1, 3]] -= xc
+    labels9[:, [2, 4]] -= yc
+    c = np.array([xc, yc])  # centers
+    segments9 = [x - c for x in segments9]
 
-        np.clip(labels9[:, 1:], 0, 2 * s, out=labels9[:, 1:])
+    for x in (labels9[:, 1:], *segments9):
+        np.clip(x, 0, 2 * s, out=x)  # clip when using random_perspective()
+    img9, labels9 = replicate(img9, labels9)  # replicate
 
-    img9, labels9 = random_perspective(img9, labels9,
-                                    degrees=self.hyp["degrees"],
-                                    translate=self.hyp["translate"],
-                                    scale=self.hyp["scale"],
-                                    shear=self.hyp["shear"],
-                                    perspective=self.hyp["perspective"],
-                                    border=self.mosaic_border)  # border to remove
+    # Augment
+    img9, labels9, segments9 = copy_paste(img9, labels9, segments9, p=self.hyp["copy_paste"])
+    img9, labels9 = random_perspective(
+        img9,
+        labels9,
+        segments9,
+        degrees=self.hyp["degrees"],
+        translate=self.hyp["translate"],
+        scale=self.hyp["scale"],
+        shear=self.hyp["shear"],
+        perspective=self.hyp["perspective"],
+        border=self.mosaic_border,
+    )  # border to remove
 
     return img9, labels9
 
@@ -617,3 +630,89 @@ def create_classification_dataloader(
         worker_init_fn=seed_worker,
         generator=generator,
     )  # or DataLoader(persistent_workers=True)
+
+def create_dataloader(
+    path,
+    imgsz,
+    batch_size,
+    stride,
+    single_cls=False,
+    hyp=None,
+    augment=False,
+    cache=False,
+    pad=0.0,
+    rect=False,
+    rank=-1,
+    workers=8,
+    image_weights=False,
+    quad=False,
+    shuffle=False,
+):
+    """Creates and returns a configured DataLoader instance for loading and processing image datasets."""
+    if rect and shuffle:
+        shuffle = False
+    with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
+        dataset = LoadImagesAndLabels(
+            path,
+            imgsz,
+            batch_size,
+            augment=augment,  # augmentation
+            hyp=hyp,  # hyperparameters
+            rect=rect,  # rectangular batches
+            cache_images=cache,
+            single_cls=single_cls,
+            stride=int(stride),
+            pad=pad,
+            image_weights=image_weights,
+            rank=rank,
+        )
+    PIN_MEMORY = str(os.getenv("PIN_MEMORY", True)).lower() == "true"
+    batch_size = min(batch_size, len(dataset))
+    nd = torch.cuda.device_count()  # number of CUDA devices
+    nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])  # number of workers
+    sampler = None if rank == -1 else SmartDistributedSampler(dataset, shuffle=shuffle)
+    loader = DataLoader if image_weights else InfiniteDataLoader  # only DataLoader allows for attribute updates
+    generator = torch.Generator()
+    generator.manual_seed(6148914691236517205 + rank)
+    if "train" in path:
+        print("build train dataloader!")
+    else:
+        print("build val dataloader!")
+    return loader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle and sampler is None,
+        num_workers=nw,
+        sampler=sampler,
+        drop_last=quad,
+        pin_memory=PIN_MEMORY,
+        collate_fn=LoadImagesAndLabels.collate_fn4 if quad else LoadImagesAndLabels.collate_fn,
+        worker_init_fn=seed_worker,
+        generator=generator,
+    ), dataset
+
+class SmartDistributedSampler(distributed.DistributedSampler):
+    """A distributed sampler ensuring deterministic shuffling and balanced data distribution across GPUs."""
+
+    def __iter__(self):
+        """Yields indices for distributed data sampling, shuffled deterministically based on epoch and seed."""
+        g = torch.Generator()
+        g.manual_seed(self.seed + self.epoch)
+
+        # determine the eventual size (n) of self.indices (DDP indices)
+        n = int((len(self.dataset) - self.rank - 1) / self.num_replicas) + 1  # num_replicas == WORLD_SIZE
+        idx = torch.randperm(n, generator=g)
+        if not self.shuffle:
+            idx = idx.sort()[0]
+
+        idx = idx.tolist()
+        if self.drop_last:
+            idx = idx[: self.num_samples]
+        else:
+            padding_size = self.num_samples - len(idx)
+            if padding_size <= len(idx):
+                idx += idx[:padding_size]
+            else:
+                idx += (idx * math.ceil(padding_size / len(idx)))[:padding_size]
+
+        return iter(idx)

@@ -8,17 +8,18 @@ import torch, yaml
 class OPT:
     def __init__(self):
         self.epochs = 50
-        self.batch_size = 8
+        self.batch_size = 16
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov4"
+        self.save_name = "yolov5l"
 
         self.img_size = 512
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.file_dir = os.path.dirname(__file__)
-        self.cfg = os.path.join(self.file_dir, "model_cfg", self.save_name + ".cfg")
+        self.cfg = self.save_name
         self.muliti_scale = True
-        self.freeze_layer = False
+        self.freeze = False
+        self.quad = True
 
         self.single_cls = False        #! 单类训练
         self.amp = True
@@ -26,6 +27,7 @@ class OPT:
         self.cache_images = False
         self.no_test = False
         self.save_best = False
+        self.image_weights = True
 
         self.data_root = os.path.join(self.file_dir, "..", "data", self.data_name)
         self.save_path = os.path.join(self.file_dir, "save_weights")

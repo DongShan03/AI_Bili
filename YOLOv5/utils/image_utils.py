@@ -26,7 +26,7 @@ class Albumentations:
     def __init__(self, size=640):
         self.transform = None
         T = [
-            A.RandomResizedCrop(height=size, width=size, scale=(0.8, 1.0), ratio=(0.9, 0.11), p=0.0),
+            A.RandomResizedCrop(size=(size, size), scale=(0.8, 1.0), ratio=(0.9, 1.1), p=0.0),
             A.Blur(p=0.01),
             A.MedianBlur(p=0.01),
             A.ToGray(p=0.01),
@@ -78,10 +78,10 @@ def hist_equalize(im, clahe=True, bgr=False):
 def replicate(im, labels):
     #* 复制图像中一半的小物体标签，用于数据扩增
     h, w = im.shape[:2]
-    boxes = labels[1:].astype(int)
+    boxes = labels[:, 1:].astype(int)
     x1, y1, x2, y2 = boxes.T
     s = ((x2 - x1) + (y2 - y1)) * 0.5  # area
-    for i in s.argsort()[:, round(s.size * 0.5)]:
+    for i in s.argsort()[:round(s.size * 0.5)]:
         x1b, y1b, x2b, y2b = boxes[i]
         bh, bw = y2b - y1b, x2b - x1b
         yc, xc = int(random.uniform(0, h - bh)), int(random.uniform(0, w - bw))  # offset x, y

@@ -642,7 +642,7 @@ def load_mosaic(self, index):
     #* 获取另外三张照片的索引
     indices = [index] + [random.randint(0, len(self.labels) - 1) for _ in range(3)]
     for i in indices:
-        img, _, h, w = load_image(self, i)
+        img, _, (h, w) = load_image(self, i)
         if i == 0:
             img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
             #* 第一张图片在右下角对其xc yc后其在img4中左上角的位置（可能有裁剪）
