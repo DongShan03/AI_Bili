@@ -1,7 +1,7 @@
 """
 整合所有参数
 """
-import os, sys
+import os, sys, re
 sys.path.append(os.path.dirname(__file__))
 import torch, yaml
 #* 这个模型的学习率配置文件存放在net_cfg/hyp.yaml
@@ -55,8 +55,10 @@ def cfg_update():
     else:
         files = os.listdir(cfg["save_path"])
         for file in files:
-            if file.endswith(".pth") & file.startswith(cfg["save_name"]):
-                nums.append(int(file.split('-')[1].split('.')[0]))
+            result = re.findall(cfg['save_name'] + r"-(\d+).pth", file)
+            if len(result) == 0:
+                continue
+            nums.append(int(result[0]))
 
     #! 如果没有训练过，resume和weights都为空
     #! 这里默认resume和weights都使用save_path下最新的模型

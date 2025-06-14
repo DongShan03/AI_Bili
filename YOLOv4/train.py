@@ -15,14 +15,6 @@ from tensorboardX import SummaryWriter
 
 warnings.filterwarnings('ignore')
 
-def get_scheduler(hyp, epochs, optimizer, start_epoch=0, state_dict=None):
-    lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - hyp['lrf']) + hyp['lrf']  # cosine
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    if state_dict:
-        scheduler.load_state_dict(state_dict)
-    scheduler.last_epoch = start_epoch
-    return scheduler
-
 def train():
     device = opt.device
     print("Using {} device training.".format(device.type))
@@ -108,8 +100,6 @@ def train():
         if ckpt.get("epoch", None) is not None:
             start_epoch = ckpt["epoch"] + 1
 
-        scheduler = get_scheduler(hyp, optimizer=optimizer, epochs=epochs, start_epoch=start_epoch, state_dict=ckpt.get("scheduler", None))
-
         if opt.epochs < start_epoch:
             epochs = start_epoch + 10
 
@@ -117,8 +107,10 @@ def train():
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
 
-    else:
-        scheduler = get_scheduler(hyp, optimizer=optimizer, epochs=epochs, start_epoch=start_epoch)
+    lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - hyp['lrf']) + hyp['lrf']  # cosine
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    scheduler.last_epoch = start_epoch - 1 if start_epoch > 0 else start_epoch
+    scheduler.step()
 
     train_dataset = LoadImagesAndLabels(
         train_path, imgsz_train, opt.batch_size, augment=True,
@@ -147,6 +139,7 @@ def train():
         pin_memory=True,
         collate_fn=val_dataset.collate_fn
     )
+
 
     model.nc = nc
     model.hyp = hyp
@@ -200,7 +193,6 @@ def train():
                         save_files = {
                             'model': model.state_dict(),
                             'optimizer': optimizer.state_dict(),
-                            "scheduler": scheduler.state_dict(),
                             'training_results': f.read(),
                             'epoch': epoch,
                             'best_map': best_map}
@@ -213,7 +205,6 @@ def train():
                             save_files = {
                                 'model': model.state_dict(),
                                 'optimizer': optimizer.state_dict(),
-                                "scheduler": scheduler.state_dict(),
                                 'training_results': f.read(),
                                 'epoch': epoch,
                                 'best_map': best_map}

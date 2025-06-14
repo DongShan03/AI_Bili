@@ -7,7 +7,7 @@ import torch, yaml
 
 class OPT:
     def __init__(self):
-        self.epochs = 100
+        self.epochs = 50
         self.batch_size = 8
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"

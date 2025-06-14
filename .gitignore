@@ -188,3 +188,4 @@ class_*.json
 COCO2017/
 VOC2012/
 yolo_data_VOC2012/
+video/
