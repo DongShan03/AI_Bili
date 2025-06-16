@@ -8,21 +8,20 @@ import torch, yaml
 class OPT:
     def __init__(self):
         self.epochs = 50
-        self.batch_size = 16
+        self.batch_size = 24
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov5l"
+        self.save_name = "yolov5m"
 
         self.img_size = 512
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.file_dir = os.path.dirname(__file__)
         self.cfg = self.save_name
         self.muliti_scale = True
-        self.freeze = False
-        self.quad = True
+        self.freeze_layer = False
+        self.mixed_precision = True
 
         self.single_cls = False        #! 单类训练
-        self.amp = True
         self.rect = True
         self.cache_images = False
         self.no_test = False

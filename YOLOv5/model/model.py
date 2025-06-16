@@ -2,10 +2,8 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from copy import deepcopy
 import contextlib
-from YOLOv5.utils.utils import read_yaml, make_divisible
+from YOLOv5.utils.utils import read_yaml, make_divisible, check_anchor_order, scale_img
 from YOLOv5.model.layers import *
-from YOLOv5.utils.autoanchor import check_anchor_order
-from YOLOv5.utils.image_utils import scale_img
 
 def create_yolov5_model(model_config, input_channel):
     #* anchor模板, 类别数, 深度倍数, 宽度倍数, 激活函数, 通道倍数
@@ -230,7 +228,22 @@ class DetectionModel(BaseModel):
             )
             mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
-Model = DetectionModel
+def initialize_weights(model):
+    """Initializes weights of Conv2d, BatchNorm2d, and activations (Hardswish, LeakyReLU, ReLU, ReLU6, SiLU) in the
+    model.
+    """
+    for m in model.modules():
+        t = type(m)
+        if t is nn.Conv2d:
+            pass  # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        elif t is nn.BatchNorm2d:
+            m.eps = 1e-3
+            m.momentum = 0.03
+        elif t in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU]:
+            m.inplace = True
+
+
+YOLOv5 = DetectionModel
 
 class SegmentationModel(DetectionModel):
     def __init__(self, cfg="yolov5s-seg.yaml", input_channel=3, nclasses=None, anchors=None):
@@ -256,7 +269,7 @@ class ClassificationModel(BaseModel):
     def _from_yaml(self, cfg):
         """Creates a YOLOv5 classification model from a specified *.yaml configuration file."""
         model_config = read_yaml(cfg)
-        self.model, _ = create_yolov5_model(deepcopy(cfg), [3])
+        self.model, _ = create_yolov5_model(model_config, [3])
         self.stride = self.model.stride
         self.save = []
 

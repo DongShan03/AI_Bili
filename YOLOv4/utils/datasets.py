@@ -781,3 +781,41 @@ def create_dataloader9(path, imgsz, batch_size, stride, opt, hyp=None, augment=F
                                     collate_fn=LoadImagesAndLabels9.collate_fn)
 
     return dataloader, dataset
+
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False,
+            scaleup=True, auto_size=32):
+    #* 输入的img是由cv2读取的 是BGR格式
+    #* shape -> h, w
+    shape = img.shape[:2]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
+    #* 计算缩放因子 使得图片最长边可以放入新尺寸
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    if not scaleup:
+        r = min(r, 1.0)
+
+    ratio = r, r
+    #* 未填充的缩放后的图片尺寸
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    #* 需要填充的像素值
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]
+    if auto:
+        #* 计算余数
+        dw, dh = np.mod(dw, auto_size), np.mod(dh, auto_size)
+    elif scaleFill:
+        #* 这里直接把图片变形缩放到填满尺寸
+        dw, dh = 0.0, 0.0
+        new_unpad = (new_shape[1], new_shape[0])
+        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]
+
+    dw /= 2
+    dh /= 2
+
+    if shape[::-1] != new_unpad:
+        img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+
+    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+    return img, ratio, (dw, dh)
