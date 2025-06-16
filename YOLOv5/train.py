@@ -40,8 +40,8 @@ def train():
     assert math.fmod(opt.img_size, gs) == 0, "Image sizes must be a multiple of 64!"
     grid_min, grid_max = imgsz_test // gs, imgsz_test // gs
     if multi_scale:
-        imgsz_min = opt.img_size // 1.5
-        imgsz_max = opt.img_size // 0.667
+        imgsz_min = opt.img_size // 1.2
+        imgsz_max = opt.img_size // 0.833
         grid_min, grid_max = imgsz_min // gs, imgsz_max // gs
         imgsz_min, imgsz_max = int(grid_min * gs), int(grid_max * gs)
         imgsz_train = imgsz_max
@@ -204,7 +204,7 @@ def train():
                     # 记录coco的12个指标加上训练总损失和lr
                     if epoch == 0:
                         f.write('Epoch ' + ' '.join(result_tags) + "\n")
-                    result_info = [str(round(i, 4)) for i in result_info + [mloss.tolist()[-1]]] + [str(round(lr, 6))]
+                    result_info = ["%.4f"%i for i in result_info + [mloss.tolist()[-1]]] + ["%.6f"%lr]
                     txt = "epoch: {} {}".format(epoch, '  '.join(result_info))
                     f.write(txt + "\n")
                     f.close()

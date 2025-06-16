@@ -334,7 +334,7 @@ def load_mosaic(self, index):
         np.clip(labels4[:, 1:], 0, 2 * s, out=labels4[:, 1:])  # use with random_affine
 
     img4, labels4 = random_affine(img4, labels4, degrees=self.hyp['degrees'], translate=self.hyp['translate'],
-                                scales=self.hyp['scale'], shear=self.hyp['shear'], border=-s//2)
+                                scale=self.hyp['scale'], shear=self.hyp['shear'], border=-s//2)
     return img4, labels4
 
 def random_affine(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10, border=0):

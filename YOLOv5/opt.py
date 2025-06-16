@@ -8,12 +8,12 @@ import torch, yaml
 class OPT:
     def __init__(self):
         self.epochs = 50
-        self.batch_size = 24
+        self.batch_size = 32
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov5m"
+        self.save_name = "yolov5s"
 
-        self.img_size = 512
+        self.img_size = 1280 if "6" == self.save_name[-1] else 640
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.file_dir = os.path.dirname(__file__)
         self.cfg = self.save_name
@@ -22,7 +22,7 @@ class OPT:
         self.mixed_precision = True
 
         self.single_cls = False        #! 单类训练
-        self.rect = True
+        self.rect = False if "6" == self.save_name[-1] else True
         self.cache_images = False
         self.no_test = False
         self.save_best = False
