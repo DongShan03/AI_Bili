@@ -82,7 +82,7 @@ def train_one_epoch(model, ema, optimizer, data_loader, device, epoch, epochs,
         now_lr = optimizer.param_groups[0]["lr"]
         mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
         s = ('Epochs: %g/%g ' + 'MEM: %4s ' + 'lr:%.6f ' + 'lbox:%8.4g ' + 'lobj:%8.4g ' + 'lcls:%8.4g ' + "loss:%8.4g") % \
-            (epoch + 1, epochs, mem, now_lr, *mloss)
+            (epoch, epochs - 1, mem, now_lr, *mloss)
         pbar.set_description(s)
 
         if ni % accumulate == 0 and lr_scheduler is not None:  # 第一轮使用warmup训练方式

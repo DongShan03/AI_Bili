@@ -6,9 +6,9 @@ import torch
 import cv2
 import numpy as np
 
-from YOLOv4.model.model import Darknet
-from YOLOv4.opt import opt
-from YOLOv4.predict import predict
+from YOLOv5.model.model import YOLOv5
+from YOLOv5.opt import opt
+from YOLOv5.predict import predict
 
 
 def main():
@@ -36,7 +36,7 @@ def main():
 
     input_size = (img_size, img_size)
     device = opt.device
-    model = Darknet(cfg=opt.cfg, img_size=input_size)
+    model = YOLOv5(cfg=opt.cfg)
     weights_dict = torch.load(weights_path, map_location='cpu')
     weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
     model.load_state_dict(weights_dict)

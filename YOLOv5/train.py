@@ -158,8 +158,8 @@ def train():
     ema = ModelEMA(model)
     maps = np.zeros(nc)  # mAP per class
     coco = get_coco_api_from_dataset(val_dataset)
-    print("starting traning for %g epochs..." % epochs)
-    print('Using %g dataloader workers' % nw)
+    print("starting training for %g epochs..." % epochs)
+    print("beginning training from %g epochs..." % start_epoch)
 
     for epoch in range(start_epoch, epochs):
         if train_dataset.image_weights:
@@ -203,9 +203,9 @@ def train():
                 with open(results_file, 'a') as f:
                     # 记录coco的12个指标加上训练总损失和lr
                     if epoch == 0:
-                        f.write('Epoch ' + ' '.join(result_tags) + "\n")
+                        f.write('Epoch  ' + '  '.join(result_tags) + "\n")
                     result_info = ["%.4f"%i for i in result_info + [mloss.tolist()[-1]]] + ["%.6f"%lr]
-                    txt = "epoch: {} {}".format(epoch, '  '.join(result_info))
+                    txt = "epoch: {:>3s} {}".format(epoch, '  '.join(result_info))
                     f.write(txt + "\n")
                     f.close()
 

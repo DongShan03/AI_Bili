@@ -1,4 +1,4 @@
-import torch
+import torch, time
 import os
 import numpy as np
 from copy import deepcopy
@@ -6,6 +6,10 @@ import math
 import yaml
 import torch.nn as nn
 import torch.nn.functional as F
+
+def time_synchronized():
+    torch.cuda.synchronize() if torch.cuda.is_available() else None
+    return time.time()
 
 def read_yaml(yaml_file):
     if not yaml_file.endswith(".yaml"): yaml_file += ".yaml"

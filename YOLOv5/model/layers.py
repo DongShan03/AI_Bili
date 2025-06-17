@@ -315,6 +315,7 @@ class MixConv2d(nn.Module):
     def forward(self, x):
         return torch.cat([m(x) for m in self.m], 1)
 
+
 class Detect(nn.Module):
     #* Yolov5 Detect head
     stride = None
