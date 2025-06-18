@@ -205,7 +205,7 @@ def train():
                     if epoch == 0:
                         f.write('Epoch  ' + '  '.join(result_tags) + "\n")
                     result_info = ["%.4f"%i for i in result_info + [mloss.tolist()[-1]]] + ["%.6f"%lr]
-                    txt = "epoch: {:>3s} {}".format(epoch, '  '.join(result_info))
+                    txt = "epoch: {:>3d}  {}".format(epoch, '  '.join(result_info))
                     f.write(txt + "\n")
                     f.close()
 

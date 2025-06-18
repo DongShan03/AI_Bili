@@ -8,10 +8,10 @@ import torch, yaml
 class OPT:
     def __init__(self):
         self.epochs = 80
-        self.batch_size = 16
+        self.batch_size = 8
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov5m"
+        self.save_name = "yolov5l"
 
         self.img_size = 1280 if "6" == self.save_name[-1] else 640
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
