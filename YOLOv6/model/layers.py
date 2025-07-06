@@ -127,6 +127,14 @@ class CSPSPPFModule(nn.Module):
             y3 = self.cv6(self.cv5(torch.cat([x1, y1, y2, self.m(y2)], 1)))
         return self.cv7(torch.cat([y0, y3], 1))
 
+class SPPF(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_size=5, e=0.5, block=ConvBNSiLU):
+        super().__init__()
+        self.sppf = SPPFModule(in_channel, out_channel, kernel_size, block)
+
+    def forward(self, x):
+        return self.sppf(x)
+
 class SimCSPSPPF(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size=5, e=0.5, block=ConvBNReLU):
         super().__init__()
@@ -473,3 +481,781 @@ class LinearAddBlock(nn.Module):
         if hasattr(self, "scale_identity"):
             out = out + self.scale_identity(inputs)
         return self.relu(self.se(self.bn(out)))
+
+class RepBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, n=1, block=RepVGGBlock, basic_block=RepVGGBlock):
+        super().__init__()
+        self.conv1 = block(in_channel, out_channel)
+        self.block = nn.Sequential(*(block(out_channel, out_channel) for _ in range(n - 1))) if n > 1 else nn.Identity()
+        if block == BottleRep:
+            self.conv1 = BottleRep(in_channel, out_channel, basic_block=basic_block, weight=True)
+            n = n // 2
+            self.block = nn.Sequential(*(BottleRep(out_channel, out_channel, basic_block=basic_block, weight=True) for _ in range(n - 1))) if n > 1 else nn.Identity()
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.block(x)
+        return x
+
+class BottleRep(nn.Module):
+    def __init__(self, in_channel, out_channel, basic_block=RepVGGBlock, weight=False):
+        super().__init__()
+        self.conv1 = basic_block(in_channel, out_channel)
+        self.conv2 = basic_block(out_channel, out_channel)
+        if in_channel != out_channel:
+            self.shortcut = False
+        else:
+            self.shortcut = True
+        if weight:
+            self.alpha = nn.Parameter(torch.ones(1))
+        else:
+            self.alpha = 1.0
+
+    def forward(self, x):
+        outputs = self.conv1(x)
+        outputs = self.conv2(outputs)
+        return outputs + self.alpha * x if self.shortcut else outputs
+
+class BottleRep3(nn.Module):
+    def __init__(self, in_channel, out_channel, basic_block=RepVGGBlock, weight=False):
+        super().__init__()
+        self.conv1 = basic_block(in_channel, out_channel)
+        self.conv2 = basic_block(out_channel, out_channel)
+        self.conv3 = basic_block(out_channel, out_channel)
+        if in_channel != out_channel:
+            self.shortcut = False
+        else:
+            self.shortcut = True
+        if weight:
+            self.alpha = nn.Parameter(torch.ones(1))
+        else:
+            self.alpha = 1.0
+
+    def forward(self, x):
+        outputs = self.conv1(x)
+        outputs = self.conv2(outputs)
+        outputs = self.conv3(outputs)
+        return outputs + self.alpha * x if self.shortcut else outputs
+
+
+class BepC3(nn.Module):
+    def __init__(self, in_channel, out_channel, n=1, e=0.5, block=RepVGGBlock):
+        super().__init__()
+        hidden_channel = int(out_channel * e)
+        self.cv1 = ConvBNReLU(in_channel, hidden_channel, 1, 1)
+        self.cv2 = ConvBNReLU(in_channel, hidden_channel, 1, 1)
+        self.cv3 = ConvBNReLU(2 * hidden_channel, 1, 1)
+        if block == ConvBNSiLU:
+            self.cv1 = ConvBNSiLU(in_channel, hidden_channel, 1, 1)
+            self.cv2 = ConvBNSiLU(in_channel, hidden_channel, 1, 1)
+            self.cv3 = ConvBNSiLU(2 * hidden_channel, 1, 1)
+        self.m = RepBlock(hidden_channel, hidden_channel, n, block=BottleRep, basic_block=block)
+
+    def forward(self, x):
+        self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), dim=1))
+
+
+class MBLABlock(nn.Module):
+    def __init__(self, in_channel, out_channel, n=1, e=0.5, block=RepVGGBlock):
+        super().__init__()
+        n = n // 2
+        if n <= 0:
+            n = 1
+
+        if n == 1:
+            n_list = [0, 1]
+        else:
+            extra_branch_steps = 1
+            while extra_branch_steps * 2 < n:
+                extra_branch_steps *= 2
+
+            n_list = [0, extra_branch_steps, n]
+        branch_num = len(n_list)
+
+        hidden_channel = int(out_channel * e)
+        self.c = hidden_channel
+        self.cv1 = ConvModule(in_channel, branch_num * self.c, 1, 1, 'relu', bias=False)
+        self.cv2 = ConvModule((sum(n_list) + branch_num) * self.c, out_channel, 1, 1, 'silu', bias=False)
+
+        if block == ConvBNSiLU:
+            self.cv1 = ConvModule(in_channel, branch_num * self.c, 1, 1, 'silu', bias=False)
+            self.cv2 = ConvModule((sum(n_list) + branch_num) * self.c, out_channel, 1, 1, 'silu', bias=False)
+
+        self.m = nn.ModuleList()
+        for n_list_i in n_list[1:]:
+            self.m.append(nn.Sequential(*(BottleRep3(self.c, self.c, basic_block=block, weight=True) for _ in range(n_list_i))))
+
+        self.split_num = tuple([self.c] * branch_num)
+
+    def forward(self, x):
+        y = list(self.cv1(x).split(self.split_num, 1))
+        all_y = [y[0]]
+        for m_idx, m_i in enumerate(self.m):
+            all_y.append(y[m_idx + 1])
+            all_y.extend(m(all_y[-1]) for m in m_i)
+        return self.cv2(torch.cat(all_y, 1))
+
+class BiFusion(nn.Module):
+    #* PAN
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.cv1 = ConvBNReLU(in_channels[0], out_channels, 1, 1)
+        self.cv2 = ConvBNReLU(in_channels[1], out_channels, 1, 1)
+        self.cv3 = ConvBNReLU(out_channels * 3, out_channels, 1, 1)
+
+        self.upsample = Transpose(out_channels, out_channels)
+        self.downsample = ConvBNReLU(out_channels, out_channels, kernel_size=3, stride=2)
+
+    def forward(self, x):
+        x0 = self.upsample(x[0])
+        x1 = self.cv1(x[1])
+        x2 = self.downsample(self.cv2(x[2]))
+        return self.cv3(torch.cat((x0, x1, x2), dim=1))
+
+def get_block(mode):
+    if mode == 'repvgg':
+        return RepVGGBlock
+    elif mode == 'qarepvgg':
+        return QARepVGGBlock
+    elif mode == 'qarepvggv2':
+        return QARepVGGBlockV2
+    elif mode == 'hyper_search':
+        return LinearAddBlock
+    elif mode == 'repopt':
+        return RealVGGBlock
+    elif mode == 'conv_relu':
+        return ConvBNReLU
+    elif mode == 'conv_silu':
+        return ConvBNSiLU
+    else:
+        raise NotImplementedError("Undefied Repblock choice for mode {}".format(mode))
+
+
+class SEBlock(nn.Module):
+    def __init__(self, channel, reduction=4):
+        super().__init__()
+        self.avgpool = nn.AdaptiveMaxPool2d(1)
+        self.conv1 = nn.Conv2d(channel, channel // reduction, 1, stride=1, padding=0)
+        self.relu = nn.ReLU()
+        self.conv = nn.Conv2d(channel // reduction, channel, 1, stride=1, padding=0)
+        self.hardsigmoid = nn.Hardsigmoid()
+
+    def forward(self, x):
+        identity = x
+        x = self.avgpool(x)
+        x = self.conv1(x)
+        x = self.relu(x)
+        x = self.conv2(x)
+        x = self.hardsigmoid(x)
+        out = identity * x
+        return out
+
+def channel_shuffle(x, groups):
+    batch_size, num_channels, height, width = x.data.size()
+    channels_per_group = num_channels // groups
+    x = x.view(batch_size, groups, channels_per_group, height, width)
+    x = torch.transpose(x, 1, 2).contiguous()
+    x = x.view(batch_size, -1, height, width)
+    return x
+
+class Lite_EffiBlockS1(nn.Module):
+    def __init__(self, in_channel, mid_channel, out_channel, stride):
+        super().__init__()
+        self.conv_pw_1 = ConvBNHS(in_channel // 2, mid_channel, kernel_size=1, stride=1, padding=0, groups=1)
+        self.conv_dw_1 = ConvBN(mid_channel, mid_channel, kernel_size=3, stride=stride, padding=1, groups=mid_channel)
+        self.se = SEBlock(mid_channel)
+        self.conv_1 = ConvBNHS(mid_channel, out_channel // 2, kernel_size=1, stride=1, padding=0, groups=1)
+
+    def forward(self, x):
+        x1, x2 = torch.split(x, split_size_or_sections=[x.shape[1] // 2, x.shape[1] // 2], dim=1)
+        x2 = self.conv_pw_1(x2)
+        x3 = self.conv_dw_1(x2)
+        x3 = self.se(x3)
+        x3 = self.conv_1(x3)
+        out = torch.cat([x1, x3], dim=1)
+        return channel_shuffle(out, 2)
+
+
+class Lite_EffiBlockS2(nn.Module):
+    def __init__(self, in_channel, mid_channel, out_channel, stride):
+        self.conv_dw_1 = ConvBN(in_channel, in_channel, kernel_size=3, stride=stride, padding=1, groups=in_channel)
+        self.conv_1 = ConvBNHS(in_channel, out_channel // 2, kernel_size=1, stride=1, padding=0, groups=1)
+        self.conv_pw_2 = ConvBNHS(in_channel, mid_channel // 2, kernel_size=1, stride=1, padding=0, groups=1)
+        self.conv_dw_2 = ConvBN(mid_channel // 2, mid_channel // 2, kernel_size=3, stride=stride, padding=1, groups=mid_channel // 2)
+        self.se = SEBlock(mid_channel // 2)
+        self.conv_2 = ConvBNHS(mid_channel // 2, out_channel // 2, kernel_size=1, stride=1, padding=0, groups=1)
+        self.conv_dw_3 = ConvBNHS(out_channel, out_channel, kernel_size=3, stride=1, padding=1, groups=out_channel)
+        self.conv_pw_3 = ConvBNHS(out_channel, out_channel, kernel_size=1, stride=1, padding=0, groups=1)
+
+    def forward(self, x):
+        x1 = self.conv_dw_1(x)
+        x1 = self.conv_1(x)
+        x2 = self.conv_pw_2(x)
+        x2 = self.conv_dw_2(x2)
+        x2 = self.se(x2)
+        x2 = self.conv_2(x2)
+        out = torch.cat([x1, x2], dim=1)
+        out = self.conv_dw_3(out)
+        out = self.conv_pw_3(out)
+        return out
+
+class DPBlock(nn.Module):
+    def __init__(self, in_channel=96, out_channel=96, kernel_size=3, stride=1):
+        super().__init__()
+        self.conv_dw_1 = nn.Conv2d(in_channel, out_channel, kernel_size, groups=out_channel, stride=stride, padding=(kernel_size - 1) // 2)
+        self.bn_1 = nn.BatchNorm2d(out_channel)
+        self.act_1 = nn.Hardswish()
+        self.conv_pw_1 = nn.Conv2d(out_channel, out_channel, kernel_size=1, groups=1, padding=0)
+        self.bn_2 = nn.BatchNorm2d(out_channel)
+        self.act_2 = nn.Hardswish()
+
+    def forward(self, x):
+        x = self.act_1(self.bn_1(self.conv_dw_1(x)))
+        x = self.act_2(self.bn_2(self.conv_pw_1(x)))
+        return x
+
+    def forward_fuse(self, x):
+        x = self.act_1(self.conv_dw_1(x))
+        x = self.act_2(self.conv_pw_1(x))
+
+class DarknetBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_size=3, expansion=0.5):
+        super().__init__()
+        hidden_channel = int(out_channel * expansion)
+        self.conv_1 = ConvBNHS(in_channel, hidden_channel, kernel_size=1, stride=1, padding=0)
+        self.conv_2 = DPBlock(hidden_channel, out_channel, kernel_size=kernel_size, stride=1)
+
+    def forward(self, x):
+        out = self.conv_1(x)
+        out = self.conv_2(out)
+        return out
+
+class CSPBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_size=3, expand_ratio=0.5):
+        super().__init__()
+        mid_channel = int(out_channel * expand_ratio)
+        self.conv_1 = ConvBNHS(in_channel, mid_channel, 1, 1, 0)
+        self.conv_2 = ConvBNHS(in_channel, mid_channel, 1, 1, 0)
+        self.conv_3 = ConvBNHS(2 * mid_channel, out_channel, 1, 1, 0)
+        self.blocks = DarknetBlock(mid_channel, mid_channel, kernel_size=kernel_size, expansion=1.0)
+
+    def forward(self, x):
+        x_1 = self.conv_1(x)
+        x_1 = self.blocks(x_1)
+        x_2 = self.conv_2(x)
+        x = torch.cat((x_1, x_2), dim=1)
+        x = self.conv_3(x)
+        return x
+
+class EfficientRep(nn.Module):
+    def __init__(self, in_channel=3, channels_list=None,
+                num_repeats=None, block=RepVGGBlock,
+                fuse_P2=False, cspsppf=False):
+        super().__init__()
+        assert channels_list is not None
+        assert num_repeats is not None
+
+        self.fuse_P2 = fuse_P2
+        self.stem = block(
+            in_channel=in_channel,
+            out_channel=channels_list[0],
+            kernel_size=3,
+            stride=2
+        )
+
+        self.ERBlock_2 = nn.Sequential(
+            block(
+                in_channel=channels_list[0],
+                out_channel=channels_list[1],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[1],
+                out_channel=channels_list[1],
+                n=num_repeats[1],
+                block=block
+            )
+        )
+
+        self.ERBlock_3 = nn.Sequential(
+            block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[2],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[2],
+                out_channel=channels_list[2],
+                n=num_repeats[2],
+                block=block
+            )
+        )
+        self.ERBlock_4 = nn.Sequential(
+            block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[3],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[3],
+                out_channel=channels_list[3],
+                n=num_repeats[3],
+                block=block
+            )
+        )
+
+        channel_merge_layer = SPPF if block == ConvBNSiLU else SimSPFF
+        if cspsppf:
+            channel_merge_layer = CSPSPPF if block == ConvBNSiLU else SimCSPSPPF
+
+        self.ERBlock_5 = nn.Sequential(
+            block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[4],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                n=num_repeats[4],
+                block=block
+            ),
+            channel_merge_layer(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                kernel_size=5
+            )
+        )
+
+    def forward(self, x):
+        outputs = []
+        x = self.stem(x)
+        x = self.ERBlock_2(x)
+        if self.fuse_P2:
+            outputs.append(x)
+        x = self.ERBlock_3(x)
+        outputs.append(x)
+        x = self.ERBlock_4(x)
+        outputs.append(x)
+        x = self.ERBlock_5(x)
+        outputs.append(x)
+        return tuple(outputs)
+
+class EfficientRep6(nn.Module):
+    def __init__(self, in_channel=3, channels_list=None,
+                num_repeats=None, block=RepVGGBlock,
+                fuse_P2=False, cspsppf=False):
+        super().__init__()
+        assert channels_list is not None
+        assert num_repeats is not None
+
+        self.fuse_P2 = fuse_P2
+        self.stem = block(
+            in_channel=in_channel,
+            out_channel=channels_list[0],
+            kernel_size=3,
+            stride=2
+        )
+
+        self.ERBlock_2 = nn.Sequential(
+            block(
+                in_channel=channels_list[0],
+                out_channel=channels_list[1],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[1],
+                out_channel=channels_list[1],
+                n=num_repeats[1],
+                block=block
+            )
+        )
+
+        self.ERBlock_3 = nn.Sequential(
+            block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[2],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[2],
+                out_channel=channels_list[2],
+                n=num_repeats[2],
+                block=block
+            )
+        )
+
+        self.ERBlock_4 = nn.Sequential(
+            block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[3],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[3],
+                out_channel=channels_list[3],
+                n=num_repeats[3],
+                block=block
+            )
+        )
+
+        self.ERBlock_5 = nn.Sequential(
+            block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[4],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                n=num_repeats[4],
+                block=block
+            )
+        )
+
+        channel_merge_layer = SimSPFF if not cspsppf else SimCSPSPPF
+
+        self.ERBlock_6 = nn.Sequential(
+            block(
+                in_channel=channels_list[4],
+                out_channel=channels_list[5],
+                kernel_size=3,
+                stride=2
+            ),
+            RepBlock(
+                in_channel=channels_list[5],
+                out_channel=channels_list[5],
+                n=num_repeats[5],
+                block=block
+            ),
+            channel_merge_layer(
+                in_channel=channels_list[5],
+                out_channel=channels_list[5],
+                kernel_size=5
+            )
+        )
+
+    def forward(self, x):
+        outputs = []
+        x = self.stem(x)
+        x = self.ERBlock_2(x)
+        if self.fuse_P2:
+            outputs.append(x)
+        x = self.ERBlock_3(x)
+        outputs.append(x)
+        x = self.ERBlock_4(x)
+        outputs.append(x)
+        x = self.ERBlock_5(x)
+        outputs.append(x)
+        x = self.ERBlock_6(x)
+        outputs.append(x)
+        return tuple(outputs)
+
+class CSPBepBackbone(nn.Module):
+    def __init__(self, in_channel=3, channels_list=None,
+                num_repeats=None, block=RepVGGBlock,
+                csp_e=float(1)/2, fuse_P2=False, cspsppf=False,
+                stage_block_type="BepC3"):
+        super().__init__()
+        assert channels_list is not None
+        assert num_repeats is not None
+
+        if stage_block_type == "BepC3":
+            stage_block = BepC3
+        elif stage_block_type == "MBLABlock":
+            stage_block = MBLABlock
+        else:
+            raise NotImplementedError
+
+        self.fuse_P2 = fuse_P2
+        self.stem = block(
+            in_channel=in_channel,
+            out_channel=channels_list[0],
+            kernel_size=3,
+            stride=2
+        )
+
+        self.ERBlock_2 = nn.Sequential(
+            block(
+                in_channel=channels_list[0],
+                out_channel=channels_list[1],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[1],
+                n=num_repeats[1],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        self.ERBlock_3 = nn.Sequential(
+            block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[2],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[2],
+                n=num_repeats[2],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        self.ERBlock_4 = nn.Sequential(
+            block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[3],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[3],
+                n=num_repeats[3],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        channel_merge_layer = SPPF if block == ConvBNSiLU else SimSPFF
+        if cspsppf:
+            channel_merge_layer = CSPSPPF if block == ConvBNSiLU else SimCSPSPPF
+
+        self.ERBlock_5 = nn.Sequential(
+            block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[4],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                n=num_repeats[4],
+                block=block,
+                e=csp_e
+            ),
+            channel_merge_layer(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                kernel_size=5
+            )
+        )
+
+    def forward(self, x):
+        outputs = []
+        x = self.stem(x)
+        x = self.ERBlock_2(x)
+        if self.fuse_P2:
+            outputs.append(x)
+        x = self.ERBlock_3(x)
+        outputs.append(x)
+        x = self.ERBlock_4(x)
+        outputs.append(x)
+        x = self.ERBlock_5(x)
+        outputs.append(x)
+        return tuple(outputs)
+
+class CSPBepBackbone_P6(nn.Module):
+    def __init__(self, in_channel=3, channels_list=None,
+                num_repeats=None, block=RepVGGBlock,
+                csp_e=float(1)/2, fuse_P2=False, cspsppf=False,
+                stage_block_type="BepC3"):
+        super().__init__()
+        assert channels_list is not None
+        assert num_repeats is not None
+
+        if stage_block_type == "BepC3":
+            stage_block = BepC3
+        elif stage_block_type == "MBLABlock":
+            stage_block = MBLABlock
+        else:
+            raise NotImplementedError
+
+        self.fuse_P2 = fuse_P2
+        self.stem = block(
+            in_channel=in_channel,
+            out_channel=channels_list[0],
+            kernel_size=3,
+            stride=2
+        )
+
+        self.ERBlock_2 = nn.Sequential(
+            block(
+                in_channel=channels_list[0],
+                out_channel=channels_list[1],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[1],
+                n=num_repeats[1],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        self.ERBlock_3 = nn.Sequential(
+            block(
+                in_channel=channels_list[1],
+                out_channel=channels_list[2],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[2],
+                n=num_repeats[2],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        self.ERBlock_4 = nn.Sequential(
+            block(
+                in_channel=channels_list[2],
+                out_channel=channels_list[3],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[3],
+                n=num_repeats[3],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        channel_merge_layer = SPPF if block == ConvBNSiLU else SimSPFF
+        if cspsppf:
+            channel_merge_layer = CSPSPPF if block == ConvBNSiLU else SimCSPSPPF
+
+        self.ERBlock_5 = nn.Sequential(
+            block(
+                in_channel=channels_list[3],
+                out_channel=channels_list[4],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[4],
+                out_channel=channels_list[4],
+                n=num_repeats[4],
+                block=block,
+                e=csp_e
+            )
+        )
+
+        self.ERBlock_6 = nn.Sequential(
+            block(
+                in_channel=channels_list[4],
+                out_channel=channels_list[5],
+                kernel_size=3,
+                stride=2
+            ),
+            stage_block(
+                in_channel=channels_list[5],
+                out_channel=channels_list[5],
+                n=num_repeats[5],
+                block=block,
+                e=csp_e
+            ),
+            channel_merge_layer(
+                in_channel=channels_list[5],
+                out_channel=channels_list[5],
+                kernel_size=5
+            )
+        )
+
+    def forward(self, x):
+        outputs = []
+        x = self.stem(x)
+        x = self.ERBlock_2(x)
+        outputs.append(x)
+        x = self.ERBlock_3(x)
+        outputs.append(x)
+        x = self.ERBlock_4(x)
+        outputs.append(x)
+        x = self.ERBlock_5(x)
+        outputs.append(x)
+        x = self.ERBlock_6(x)
+        outputs.append(x)
+        return tuple(outputs)
+
+class Lite_EffiBackbone(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels, num_repeats=[1, 3, 7, 3]):
+        super().__init__()
+        out_channels[0] = 24
+        self.conv0 = ConvBNHS(in_channel=in_channels,
+                            out_channel=out_channels[0],
+                            kernel_size=3,
+                            stride=2,
+                            padding=1)
+
+        self.lite_effiblock_1 = self.build_block(num_repeats[0],
+                                                out_channels[0],
+                                                mid_channels[1],
+                                                out_channels[1])
+
+        self.lite_effiblock_2 = self.build_block(num_repeats[1],
+                                                out_channels[1],
+                                                mid_channels[2],
+                                                out_channels[2])
+
+        self.lite_effiblock_3 = self.build_block(num_repeats[2],
+                                                out_channels[2],
+                                                mid_channels[3],
+                                                out_channels[3])
+
+        self.lite_effiblock_4 = self.build_block(num_repeats[3],
+                                                out_channels[3],
+                                                mid_channels[4],
+                                                out_channels[4])
+
+    def forward(self, x):
+        outputs = []
+        x = self.conv0(x)
+        x = self.lite_effiblock_1(x)
+        x = self.lite_effiblock_2(x)
+        outputs.append(x)
+        x = self.lite_effiblock_3(x)
+        outputs.append(x)
+        x = self.lite_effiblock_4(x)
+        outputs.append(x)
+        return tuple(outputs)
+
+    @staticmethod
+    def build_block(num_repeat, in_channel, mid_channel, out_channel):
+        block_list = nn.Sequential()
+        for i in range(num_repeat):
+            if i == 0:
+                block = Lite_EffiBlockS2(
+                    in_channel=in_channel,
+                    mid_channel=mid_channel,
+                    out_channel=out_channel,
+                    stride=2
+                )
+            else:
+                block = Lite_EffiBlockS1(
+                    in_channel=in_channel,
+                    mid_channel=mid_channel,
+                    out_channel=out_channel,
+                    stride=1
+                )
+            block_list.add_module(str(i), block)
+        return block_list
