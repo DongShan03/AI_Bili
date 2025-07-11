@@ -60,8 +60,8 @@ def xywh2xyxy(x):
 def box_iou(box1, box2):
     def box_area(box):
         return (box[2] - box[0]) * (box[3] - box[1])
-    area1 = box_area(box1)
-    area2 = box_area(box2)
+    area1 = box_area(box1.T)
+    area2 = box_area(box2.T)
     inter = (torch.min(box1[:, None, 2:], box2[:, 2:]) - torch.max(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
     return inter / (area1[:, None] + area2 - inter)
 
@@ -168,7 +168,7 @@ def scale_img(img, ratio=1.0, same_shape=False, gs=32):
     if ratio == 1.0:
         return img
     else:
-        h, w = img.shape[-2:]
+        h, w = img.shape[2:]
         s = (int(h * ratio), int(w * ratio))
         img = F.interpolate(img, size=s, mode='bilinear', align_corners=False)
         if not same_shape:
@@ -427,3 +427,12 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=
             return iou - (c_area - union) / c_area  # GIoU
     else:
         return iou  # IoU
+
+def xywh2xyxy(x):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    return y

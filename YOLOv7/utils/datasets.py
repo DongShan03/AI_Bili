@@ -163,6 +163,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         self.imgs = [None] * n
         self.labels = [torch.zeros((0, 5), dtype=torch.float32)] * n
+        self.indices = range(n)
         nm, nf, ne, ns, nd = 0, 0, 0, 0, 0
         labels_path = str(Path(self.label_files[0]).parent) + ".npy"
         labels_loaded = False
@@ -228,8 +229,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         return torch.from_numpy(labels), o_shapes
 
     def __getitem__(self, index):
-        if self.image_weights:
-            index = self.indices[index]
+        index = self.indices[index]
         hyp = self.hyp
         if self.mosaic:
             if random.random() < 0.8:
@@ -261,8 +261,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             augment_hsv(img, h_gain=hyp['hsv_h'], s_gain=hyp['hsv_s'], v_gain=hyp['hsv_v'])
 
             # Apply cutouts
-            if random.random() < 0.4:
-                labels = cutout(img, labels)
+            # if random.random() < 0.4:
+            #     labels = cutout(img, labels)
 
         nL = len(labels)
         if nL:
@@ -455,7 +455,7 @@ def load_mosaic(self, index):
     labels4 = []
     s = self.img_size
     xc, yc = [int(random.uniform(s * 0.5, s * 1.5)) for _ in range(2)]  # mosaic center x, y
-    indices = [index] + [random.randint(0, len(self.labels) - 1) for _ in range(3)]  # 3 additional image indices
+    indices = [index] + random.choices(self.indices, k=3)  # 3 additional image indices
     for i, index in enumerate(indices):
         img, _, (h, w) = load_image(self, index)
 
@@ -533,7 +533,6 @@ def load_mosaic9(self, index):
         labels = self.labels[index].copy()
         if labels.size:
             labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padx, pady)  # normalized xywh to pixel xyxy format
-            segments = [xyn2xy(x, w, h, padx, pady) for x in segments]
         labels9.append(labels)
 
         # Image

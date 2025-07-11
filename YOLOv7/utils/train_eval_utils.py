@@ -4,13 +4,14 @@ import random, math, time
 import torch.nn.functional as F
 from tqdm import tqdm
 from YOLOv7.utils.utils import *
-from YOLOv7.utils.loss import ComputeLoss, ComputeLossOTA, non_max_suppression
 from YOLOv7.utils.coco_eval import CocoEvaluator
 from YOLOv7.utils.coco_utils import get_coco_api_from_dataset
 import YOLOv7.utils.distributed_utils as utils
 
 
-def train_one_epoch(model, ema, optimizer, data_loader, device, epoch, epochs,
+def train_one_epoch(model, optimizer, data_loader,
+                    computeLoss, computeLossOTA,
+                    device, epoch, epochs, hyp,
                     accumulate, img_size,
                     grid_min, grid_max, gs,
                     multi_scale=False, warmup=False, scaler=None):
@@ -53,9 +54,11 @@ def train_one_epoch(model, ema, optimizer, data_loader, device, epoch, epochs,
                 imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
         with torch.amp.autocast("cuda", enabled=scaler is not None):
-            pred = model(imgs)
-            # loss
-            loss, loss_items = compute_loss(pred, targets, model)
+            pred = model(imgs, augment=False)  # forward
+            if 'loss_ota' not in hyp or hyp['loss_ota'] == 1:
+                loss, loss_items = computeLossOTA(pred, targets.to(device), imgs)  # loss scaled by batch_size
+            else:
+                loss, loss_items = computeLoss(pred, targets.to(device))  # loss scaled by batch_size
         if not torch.isfinite(loss):
             print('WARNING: non-finite loss, ending training ', loss)
             print("training image path: {}".format(",".join(paths)))

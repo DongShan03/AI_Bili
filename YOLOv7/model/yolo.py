@@ -88,7 +88,7 @@ class IDetect(nn.Module):
     def __init__(self, nc=80, anchors=(), ch=()):
         super().__init__()
         self.nc = nc
-        self.nc = nc + 5
+        self.no = nc + 5
         self.nl = len(anchors)          #* number of detection layers
         self.na = len(anchors[0]) // 2  #* number of anchors
         self.grid = [torch.zeros(1)] * self.nl

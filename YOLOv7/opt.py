@@ -11,7 +11,7 @@ class OPT:
         self.batch_size = 8
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov7-tiny"
+        self.save_name = "yolov7"
 
         self.img_size = 640
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

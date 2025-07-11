@@ -682,7 +682,7 @@ class RepConv(nn.Module):
         else:
             self.rbr_identity = (nn.BatchNorm2d(c1) if c2 == c1 and s == 1 else None)
             self.rbr_dense = nn.Sequential(
-                nn.Conv2d(c1, c2, 1, s, padding_l1, groups=g, bias=False),
+                nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False),
                 nn.BatchNorm2d(c2),
             )
             self.rbr_1x1 = nn.Sequential(
