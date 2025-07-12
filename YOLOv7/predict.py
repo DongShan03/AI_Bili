@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from PIL import Image
 
 from YOLOv7.utils import utils
-from YOLOv7.utils.loss import non_max_suppression
+from YOLOv7.utils.utils import non_max_suppression
 from YOLOv7.utils.datasets import letterbox
 from YOLOv7.model.yolo import Model
 from YOLOv7.utils.draw_box_utils import draw_objs

@@ -168,7 +168,7 @@ def train():
             train_dataset.indices = random.choices(range(train_dataset.n), weights=image_weights, k=train_dataset.n)
 
         mloss, lr = train_one_epoch(
-            model, ema, optimizer, train_dataloader,
+            model, optimizer, train_dataloader,
             device, epoch, epochs,
             accumulate=accumulate,  # 迭代多少batch才训练完64张图片
             img_size=imgsz_train,  # 输入图像的大小

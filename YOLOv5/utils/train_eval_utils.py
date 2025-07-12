@@ -11,7 +11,7 @@ from YOLOv5.utils.coco_utils import get_coco_api_from_dataset
 import YOLOv5.utils.distributed_utils as utils
 
 
-def train_one_epoch(model, ema, optimizer, data_loader, device, epoch, epochs,
+def train_one_epoch(model, optimizer, data_loader, device, epoch, epochs,
                     accumulate, img_size,
                     grid_min, grid_max, gs,
                     multi_scale=False, warmup=False, scaler=None):

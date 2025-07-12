@@ -53,18 +53,16 @@ def exif_size(img):
 
     return s
 
-def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=False, cache=False, pad=0.0, rect=False,
-                    rank=-1, world_size=1, workers=8, image_weights=False, quad=False, prefix=''):
-    with torch_distributed_zero_first(rank):
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size, stride, opt, hyp=hyp, augment=augment, cache_images=cache,
-                                    single_cls=opt.single_cls, stride=int(stride), rect=rect, pad=pad, image_weights=image_weights,
-                                    prefix=prefix)
+def create_dataloader(path, imgsz, batch_size, single_cls=False, hyp=None, augment=False, cache_images=False, pad=0.0, rect=False,
+                    workers=8, image_weights=False, prefix=''):
+    dataset = LoadImagesAndLabels(path, imgsz, batch_size, hyp=hyp, augment=augment, cache_images=cache_images,
+                                single_cls=single_cls, rect=rect, pad=pad, image_weights=image_weights,
+                                prefix=prefix)
     batch_size = min(batch_size, len(dataset))
-    nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, workers])  # number of workers
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset) if rank != -1 else None
+    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, workers])  # number of workers
     loader = torch.utils.data.DataLoader if image_weights else InfiniteDataLoader
-    dataloader = loader(dataset, batch_size=batch_size, num_workers=nw, sampler=sampler, pin_memory=True,
-                        collate_fn=LoadImagesAndLabels.collate_fn4 if quad else LoadImagesAndLabels.collate_fn)
+    dataloader = loader(dataset, batch_size=batch_size, num_workers=nw, pin_memory=True,
+                        collate_fn=LoadImagesAndLabels.collate_fn)
     return dataloader, dataset
 
 class InfiniteDataLoader(torch.utils.data.dataloader.DataLoader):
@@ -98,7 +96,7 @@ def img2label_paths(img_paths):
 
 class LoadImagesAndLabels(Dataset):  # for training/testing
     def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
-                cache_images=False, single_cls=False, stride=32, pad=0.0, prefix=''):
+                cache_images=False, single_cls=False, pad=0.0):
         path = str(Path(path)) + os.sep + "images"
         try:
             # parent = str(Path(path).parent) + os.sep

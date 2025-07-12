@@ -10,15 +10,15 @@ import YOLOv7.utils.distributed_utils as utils
 
 
 def train_one_epoch(model, optimizer, data_loader,
-                    computeLoss, computeLossOTA,
-                    device, epoch, epochs, hyp,
+                    computeLoss,
+                    device, epoch, epochs,
                     accumulate, img_size,
                     grid_min, grid_max, gs,
                     multi_scale=False, warmup=False, scaler=None):
     model.train()
 
     lr_scheduler = None
-    if epoch == 0 and warmup is True:  # 当训练第一轮（epoch=0）时，启用warmup训练方式，可理解为热身训练
+    if epoch == 1 and warmup is True:  # 当训练第一轮（epoch=0）时，启用warmup训练方式，可理解为热身训练
         warmup_factor = 1.0 / 1000
         warmup_iters = min(1000, len(data_loader) - 1)
 
@@ -55,10 +55,7 @@ def train_one_epoch(model, optimizer, data_loader,
 
         with torch.amp.autocast("cuda", enabled=scaler is not None):
             pred = model(imgs, augment=False)  # forward
-            if 'loss_ota' not in hyp or hyp['loss_ota'] == 1:
-                loss, loss_items = computeLossOTA(pred, targets.to(device), imgs)  # loss scaled by batch_size
-            else:
-                loss, loss_items = computeLoss(pred, targets.to(device))  # loss scaled by batch_size
+            loss, loss_items = computeLoss(pred, targets.to(device))  # loss scaled by batch_size
         if not torch.isfinite(loss):
             print('WARNING: non-finite loss, ending training ', loss)
             print("training image path: {}".format(",".join(paths)))
@@ -84,7 +81,7 @@ def train_one_epoch(model, optimizer, data_loader,
         now_lr = optimizer.param_groups[0]["lr"]
         mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
         s = ('Epochs: %g/%g ' + 'MEM: %4s ' + 'lr:%.6f ' + 'lbox:%8.4g ' + 'lobj:%8.4g ' + 'lcls:%8.4g ' + "loss:%8.4g") % \
-            (epoch, epochs - 1, mem, now_lr, *mloss)
+            (epoch, epochs, mem, now_lr, *mloss)
         pbar.set_description(s)
 
         if ni % accumulate == 0 and lr_scheduler is not None:  # 第一轮使用warmup训练方式

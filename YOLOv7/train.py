@@ -1,7 +1,7 @@
 import sys, os, math, warnings, random
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from YOLOv7.opt import opt
-from YOLOv7.model.yolo import Model
+from YOLOv7.model.yolo import Model, IDetect, Detect, IBin, IAuxDetect, IKeypoint
 from YOLOv7.utils.datasets import LoadImagesAndLabels
 from YOLOv7.utils.utils import *
 from YOLOv7.utils.coco_utils import get_coco_api_from_dataset
@@ -52,7 +52,8 @@ def train():
     # 是否冻结权重，只训练predictor的权重
     if opt.freeze_layer:
         # 索引减一对应的是predictor的索引，YOLOLayer并不是predictor
-        output_layer_indices = [idx - 1 for idx, module in enumerate(model.module_list) if isinstance(module, Detect)]
+        output_layer_indices = [idx - 1 for idx, module in enumerate(model.module_list) \
+                            if isinstance(module, (Detect, IDetect, IAuxDetect, IBin, IKeypoint))]
 
         # 冻结除了predictor和YOLOLayer外的所有参数
         freeze_layer_indeces = [
@@ -73,7 +74,7 @@ def train():
     scaler = torch.GradScaler("cuda") if device.type == "cuda" else None
 
     epochs = opt.epochs
-    start_epoch = 0
+    start_epoch = 1
     best_map = 0.0
 
     if opt.resume.endswith(".pt") or opt.resume.endswith(".pth"):
@@ -84,6 +85,7 @@ def train():
             if len(missing_keys) != 0 or len(unexpected_keys) != 0:
                 print("missing_keys: ", missing_keys)
                 print("unexpected_keys: ", unexpected_keys)
+
             pre_weights_dict = {k: v for k, v in pre_weights_dict.items() if model.state_dict()[k].numel() == v.numel()}
             model.load_state_dict(pre_weights_dict, strict=False)
         except KeyError as e:
@@ -96,7 +98,6 @@ def train():
             if "best_map" in ckpt.keys():
                 best_map = ckpt["best_map"]
 
-
         if ckpt.get("training_result", None) is not None:
             with open(results_file, "w") as file:
                 file.write(ckpt["training_result"])
@@ -105,7 +106,7 @@ def train():
             start_epoch = ckpt["epoch"] + 1
 
         if opt.epochs < start_epoch:
-            epochs = start_epoch + 20
+            epochs = start_epoch + 20 - 1
 
         if opt.mixed_precision and "scaler" in ckpt:
             scaler.load_state_dict(ckpt["scaler"])
@@ -113,7 +114,7 @@ def train():
 
     lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - hyp['lrf']) + hyp['lrf']  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    scheduler.last_epoch = start_epoch - 1 if start_epoch > 0 else start_epoch
+    scheduler.last_epoch = min(start_epoch - 1, 0)
     scheduler.step()
 
     train_dataset = LoadImagesAndLabels(
@@ -138,7 +139,7 @@ def train():
         batch_size=opt.batch_size,
         num_workers=nw,
         shuffle=not opt.rect,
-        pin_memory=False,
+        pin_memory=True,
         collate_fn=train_dataset.collate_fn
     )
     val_dataloader = torch.utils.data.DataLoader(
@@ -157,14 +158,16 @@ def train():
     model.class_weights = labels_to_class_weights(train_dataset.labels, nc).to(device)
 
     ema = ModelEMA(model)
-    computeLoss = ComputeLoss(model)
-    computeLossOTA = ComputeLossOTA(model)
+    if 'loss_ota' not in hyp or hyp['loss_ota'] == 1:
+        computeLoss = ComputeLossOTA(model)
+    else:
+        computeLoss = ComputeLoss(model)
     maps = np.zeros(nc)  # mAP per class
     coco = get_coco_api_from_dataset(val_dataset)
     print("starting training for %g epochs..." % epochs)
     print("beginning training from %g epochs..." % start_epoch)
 
-    for epoch in range(start_epoch, epochs):
+    for epoch in range(start_epoch, epochs + 1):
         if train_dataset.image_weights:
             w = model.class_weights.cpu().numpy() * (1 - maps) ** 2
             image_weights = labels_to_image_weights(train_dataset.labels, nc=nc, class_weights=w).to(device)
@@ -172,8 +175,8 @@ def train():
 
         mloss, lr = train_one_epoch(
             model, optimizer, train_dataloader,
-            computeLoss, computeLossOTA,
-            device, epoch, epochs, hyp=hyp,
+            computeLoss,
+            device, epoch, epochs,
             accumulate=accumulate,  # 迭代多少batch才训练完64张图片
             img_size=imgsz_train,  # 输入图像的大小
             multi_scale=multi_scale,
@@ -187,7 +190,7 @@ def train():
         scheduler.step()
         ema.update_attr(model)
 
-        if opt.no_test is False or epoch == epochs - 1:
+        if opt.no_test is False or epoch == epochs:
             result_info = evaluate(model, val_dataloader, coco=coco, device=device)
             coco_mAP = result_info[0]
             voc_mAP = result_info[1]
@@ -206,7 +209,7 @@ def train():
                                "AR@[area=small]", "AR@[area=middle]", "AR@[area=large]", "mloss", 'lr']
                 with open(results_file, 'a') as f:
                     # 记录coco的12个指标加上训练总损失和lr
-                    if epoch == 0:
+                    if epoch == 1:
                         f.write('Epoch  ' + '  '.join(result_tags) + "\n")
                     result_info = ["%.4f"%i for i in result_info + [mloss.tolist()[-1]]] + ["%.6f"%lr]
                     txt = "epoch: {:>3d}  {}".format(epoch, '  '.join(result_info))

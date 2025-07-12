@@ -155,7 +155,7 @@ class IDetect(nn.Module):
         print("IDetect.fuse")
         for i in range(len(self.m)):
             c1, c2, _, _ = self.m[i].weight.shape
-            c1_, c2_, _, _ = self.ia[i].implicit.weight.shape
+            c1_, c2_, _, _ = self.ia[i].implicit.shape
             self.m[i].bias += torch.matmul(self.m[i].weight.reshape(c1, c2), self.ia[i].implicit.reshape(c2_, c1_)).squeeze(1)
 
         for i in range(len(self.m)):

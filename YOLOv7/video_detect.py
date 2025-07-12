@@ -40,12 +40,12 @@ def main():
     weights_dict = torch.load(weights_path, map_location='cpu')
     weights_dict = weights_dict["model"] if "model" in weights_dict else weights_dict
     model.load_state_dict(weights_dict)
-    model.fuse()
     model.to(device)
 
     model.eval()
     # plt.ion()
     with torch.no_grad():
+        model.fuse()
         for path in all_videos:
             cap = cv2.VideoCapture(path)
             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

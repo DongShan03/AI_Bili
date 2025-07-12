@@ -117,7 +117,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
 
         c = x[:, 5:6] * (0 if agnostic else max_wh)
-        boxes, scores = x[:, :4] + c, c[:, 4]  #* boxes (根据对应的类别向右下角便宜), scores
+        boxes, scores = x[:, :4] + c, x[:, 4]  #* boxes (根据对应的类别向右下角便宜), scores
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         if i.shape[0] > max_det:
             i = i[:max_det]
@@ -315,7 +315,7 @@ def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
     n = len(labels)
     class_counts = np.array([np.bincount(labels[i][:, 0].astype(np.int32), minlength=nc) for i in range(n)])
     image_weights = (class_weights.reshape(1, nc) * class_counts).sum(1)
-    return image_weights
+    return torch.from_numpy(image_weights)
 
 class ModelEMA:
     """ Model Exponential Moving Average from https://github.com/rwightman/pytorch-image-models

@@ -39,3 +39,4 @@ mosaic: 0.85834
 mixup: 0.04266
 copy_paste: 0.0
 anchors: 3.412
+loss_ota: 0.0

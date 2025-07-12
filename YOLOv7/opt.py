@@ -7,13 +7,13 @@ import torch, yaml
 
 class OPT:
     def __init__(self):
-        self.epochs = 80
-        self.batch_size = 8
+        self.epochs = 40
+        self.batch_size = 4
         self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov7"
+        self.save_name = "yolov7x"
 
-        self.img_size = 640
+        self.img_size = 512
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.file_dir = os.path.dirname(__file__)
         self.cfg = self.save_name
@@ -32,7 +32,7 @@ class OPT:
         self.save_path = os.path.join(self.file_dir, "save_weights")
         self.img_save_path = os.path.join(self.data_root, "test")
         self.resume = ""
-        self.start_epoch = 0
+        self.start_epoch = 1
         self.weights = ""
 
         self.cfg = self.read_yaml(os.path.join(self.file_dir, "model_cfg", self.save_name + ".yaml"))
@@ -69,8 +69,8 @@ class OPT:
             #! 取模型编号最大的模型用于继续训练或者预测
             num = sorted(nums, reverse=True)[0]
             #! 启动一次至少训练20个epoch
-            if (self.epochs < num+1+20):
-                self.epochs = num+1+20
+            if (self.epochs < num + 20):
+                self.epochs = num + 20
             self.resume = os.path.join(self.save_path, self.save_name + f"-{num}.pth")
             #! 如果resume为空，那么weights就等于resume
             if self.weights == "":
