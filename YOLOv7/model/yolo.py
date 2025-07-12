@@ -311,7 +311,7 @@ class IAuxDetect(nn.Module):
                 y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
                 z.append(y.view(bs, -1, self.no))
 
-        return x if self.training else (torch.cat(z, 1), x)
+        return x if self.training else (torch.cat(z, 1), x[:self.nl])
 
     def fuseforward(self, x):
         z = []
@@ -343,7 +343,7 @@ class IAuxDetect(nn.Module):
         return out
 
     def fuse(self):
-        print("iAuxDetect.fuse")
+        print("IAuxDetect.fuse")
         for i in range(len(self.m)):
             c1, c2, _, _ = self.m[i].weight.shape
             c1_, c2_, _, _ = self.ia[i].implicit.weight.shape
@@ -356,7 +356,7 @@ class IAuxDetect(nn.Module):
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
-        yv, xv = torch.meshgrid(torch.arange(ny), torch.arange(nx))
+        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing='ij')
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 
     def convert(self, z):
@@ -465,7 +465,7 @@ class Model(nn.Module):
             self._initialize_biases()
         elif isinstance(m, IAuxDetect):
             s = 256
-            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])
+            m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))[:4]])
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
@@ -524,7 +524,6 @@ class Model(nn.Module):
                     m(x.copy() if c else x)
                 dt.append((time_synchronized() - t) * 100)
                 print('%10.1f%10.0f%10.1fms %-40s' % (o, m.np, dt[-1], m.type))
-
             x = m(x)
             y.append(x if m.i in self.save else None)
 
@@ -667,6 +666,8 @@ def parse_model(d, ch):
             args.append([ch[x] for x in f])
             if isinstance(args[1], int):
                 args[1] = [list(range(args[1] * 2))] * len(f)
+        elif m is ReOrg:
+            c2 = ch[f] * 4
         elif m is Contract:
             c2 = ch[f] * args[0] ** 2
         elif m is Expand:

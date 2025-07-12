@@ -6,7 +6,7 @@ from YOLOv7.utils.datasets import LoadImagesAndLabels
 from YOLOv7.utils.utils import *
 from YOLOv7.utils.coco_utils import get_coco_api_from_dataset
 from YOLOv7.utils.train_eval_utils import train_one_epoch, evaluate
-from YOLOv7.utils.loss import ComputeLoss, ComputeLossOTA
+from YOLOv7.utils.loss import ComputeLoss, ComputeLossAuxOTA
 
 import numpy as np
 import torch.optim.lr_scheduler as lr_scheduler
@@ -40,7 +40,7 @@ def train():
     hyp['obj'] *= (imgsz_train / 640) ** 2 * 3. / nl  # scale to image size and layers
 
     gs = 64
-    assert math.fmod(opt.img_size, gs) == 0, "Image sizes must be a multiple of 64!"
+    assert math.fmod(opt.img_size, gs) == 0, f"Image sizes must be a multiple of {gs}!"
     grid_min, grid_max = imgsz_test // gs, imgsz_test // gs
     #* 模型内部集成了多尺度训练
     if multi_scale:
@@ -160,8 +160,8 @@ def train():
     model.class_weights = labels_to_class_weights(train_dataset.labels, nc).to(device)
 
     ema = ModelEMA(model)
-    computeLossOTA = ComputeLossOTA(model)
-    computeLoss = ComputeLoss(model)
+    computeLossOTA = ComputeLossAuxOTA(model)
+    computeLoss = None
     maps = np.zeros(nc)  # mAP per class
     coco = get_coco_api_from_dataset(val_dataset)
     print("starting training for %g epochs..." % epochs)
@@ -185,7 +185,7 @@ def train():
             gs=gs,  # grid step: 32
             warmup=True,
             scaler=scaler,
-            use_OTA= 'loss_ota' not in hyp or hyp['loss_ota'] == 1
+            use_OTA=True
         )
         # update scheduler
         scheduler.step()

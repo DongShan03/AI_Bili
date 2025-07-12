@@ -10,11 +10,11 @@ import YOLOv7.utils.distributed_utils as utils
 
 
 def train_one_epoch(model, optimizer, data_loader,
-                    computeLoss,
+                    computeLoss, computeLossOTA,
                     device, epoch, epochs,
                     accumulate, img_size,
                     grid_min, grid_max, gs,
-                    multi_scale=False, warmup=False, scaler=None):
+                    multi_scale=False, warmup=False, scaler=None, use_OTA=False):
     model.train()
 
     lr_scheduler = None
@@ -55,7 +55,10 @@ def train_one_epoch(model, optimizer, data_loader,
 
         with torch.amp.autocast("cuda", enabled=scaler is not None):
             pred = model(imgs, augment=False)  # forward
-            loss, loss_items = computeLoss(pred, targets.to(device))  # loss scaled by batch_size
+            if use_OTA:
+                loss, loss_items = computeLossOTA(pred, targets.to(device), imgs)
+            else:
+                loss, loss_items = computeLoss(pred, targets.to(device))  # loss scaled by batch_size
         if not torch.isfinite(loss):
             print('WARNING: non-finite loss, ending training ', loss)
             print("training image path: {}".format(",".join(paths)))

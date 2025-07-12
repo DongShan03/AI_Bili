@@ -8,6 +8,7 @@ import cv2, re
 from pathlib import Path
 from copy import deepcopy
 logger = logging.getLogger(__name__)
+logger.setLevel(level = logging.INFO)
 
 
 def make_divisible(v, divisor):
@@ -164,7 +165,7 @@ def copy_attr(a, b, include=(), exclude=()):
         else:
             setattr(a, k, v)
 
-def scale_img(img, ratio=1.0, same_shape=False, gs=32):
+def scale_img(img, ratio=1.0, same_shape=False, gs=64):
     if ratio == 1.0:
         return img
     else:
@@ -182,7 +183,7 @@ def time_synchronized():
         torch.cuda.synchronize()
     return time.time()
 
-def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=64):
     # Resize and pad image while meeting stride-multiple constraints
     shape = img.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):

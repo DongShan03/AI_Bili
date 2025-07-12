@@ -7,13 +7,13 @@ import torch, yaml
 
 class OPT:
     def __init__(self):
-        self.epochs = 40
-        self.batch_size = 4
-        self.num_classes = 20
         self.data_name = "yolo_data_VOC2012"
-        self.save_name = "yolov7x"
+        self.save_name = "yolov7-w6"
+        self.epochs = 40
+        self.batch_size = 2 if "6" in self.save_name else (16 if "tiny" in self.save_name else 8)
+        self.num_classes = 20
 
-        self.img_size = 512
+        self.img_size = 640 if "6" not in self.save_name else 1280
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.file_dir = os.path.dirname(__file__)
         self.cfg = self.save_name
@@ -36,7 +36,7 @@ class OPT:
         self.weights = ""
 
         self.cfg = self.read_yaml(os.path.join(self.file_dir, "model_cfg", self.save_name + ".yaml"))
-        self.hyp = self.read_yaml(os.path.join(self.file_dir, "model_cfg", "hyp.yaml"))
+        self.hyp = self.read_yaml(os.path.join(self.file_dir, "model_cfg", "hyp.yaml" if "6" not in self.save_name else "hyp-aux.yaml"))
         self.weight_update()
 
     def read_yaml(self, yaml_file):

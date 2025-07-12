@@ -157,7 +157,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 elif mini > 1:
                     shapes[i] = [1, 1 / mini]
 
-            self.batch_shapes = np.ceil(np.array(shapes) * img_size / 32. + pad).astype(np.int32) * 32
+            self.batch_shapes = np.ceil(np.array(shapes) * img_size / 64. + pad).astype(np.int32) * 64
 
         self.imgs = [None] * n
         self.labels = [torch.zeros((0, 5), dtype=torch.float32)] * n
