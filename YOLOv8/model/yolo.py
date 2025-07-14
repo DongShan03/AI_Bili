@@ -3,6 +3,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from YOLOv8.model.layers import *
 from YOLOv8.utils.utils import *
 from pathlib import Path
+import contextlib
 import logging
 logger = logging.getLogger(__name__)
 from copy import deepcopy
@@ -30,19 +31,12 @@ class Detect(nn.Module):
         self.reg_max = 16   # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
         self.no = nc + self.reg_max * 4 #* 每个anchor对用的输出
         self.stride = torch.zeros(self.nl)
-        c2, c3 = max((16, ch[0] // 4, self.reg_max * 4)), max(ch[0], min(self.nc, 1000))
+        c2, c3 = max((16, ch[0] // 4, self.reg_max * 4)), max(ch[0], self.nc)
         self.cv2 = nn.ModuleList(
             nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch
         )
 
-        self.cv3 = nn.ModuleList(
-            nn.Sequential(
-                nn.Sequential(DWConv(x, x, 3), Conv(x, c3, 1)),
-                nn.Sequential(DWConv(c3, c3, 3), Conv(c3, c3, 1)),
-                nn.Conv2d(c3, self.nc, 1),
-            )
-            for x in ch
-        )
+        self.cv3 = nn.ModuleList(nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1)) for x in ch)
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
 
     def forward(self, x):
@@ -68,9 +62,9 @@ class Detect(nn.Module):
 
         return torch.cat((dbox, cls.sigmoid()), 1)
 
-    def decode_bboxes(self, bboxes, anchors, xywh):
+    def decode_bboxes(self, bboxes, anchors, xywh=True):
         #* 将距离坐标转换为真实坐标
-        return dist2bbox(bboxes, anchors, xywh, dim=1)
+        return dist2bbox(bboxes, anchors, xywh=xywh, dim=1)
 
     def bias_init(self):
         m = self
@@ -113,7 +107,7 @@ class Model(nn.Module):
         ch = self.yaml['ch'] = self.yaml.get('ch', ch)
         dep_mul, wid_mul, max_channels = self.yaml["scales"][phi]
         #* input img -> (3, 640, 640)
-        self.model, self.save = parse_model(deepcopy(self.yaml), ch=[ch], gd=dep_mul, gw=wid_mul, mc=max_channels)
+        self.model, self.save = parse_model(deepcopy(self.yaml), ch=[ch], gd=dep_mul, gw=wid_mul)
         #* 物体分类的默认名称
         self.names = {i: f"{i}" for i in range(self.yaml["nc"])}  # default names dict
         # self.inplace = self.yaml.get("inplace", True)
@@ -172,10 +166,10 @@ class Model(nn.Module):
                 m.forward = m.fuseforward
         return self
 
-#* model_dict, input_channels(3)
-def parse_model(d, ch, gd, gw, mc):
+# #* model_dict, input_channels(3)
+def parse_model(d, ch, gd, gw):
     nc = d["nc"]
-    no = nc + 16 * 4
+    act = d.get('activation')
     # anchors, nc = d["anchors"], d["nc"]
     # na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors
     # no = na * (nc + 5)  #* number of outputs = anchors * (classes + 5)
@@ -185,17 +179,20 @@ def parse_model(d, ch, gd, gw, mc):
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):
         m = eval(m) if isinstance(m, str) else m
         for j, a in enumerate(args):
-            try:
+            with contextlib.suppress(NameError):
                 args[j] = eval(a) if isinstance(a, str) else a
-            except:
-                pass
+
         n = max(round(n * gd), 1) if n > 1 else n #* depth gain
-        if m in [nn.Conv2d, Conv, DWConv, GhostConv, SPPF, C2f]:
+        if m in [nn.Conv2d, Conv, DWConv, GhostConv, SPPF, C2f, Bottleneck,
+                nn.ConvTranspose2d, C3, C3Ghost, GhostBottleneck]:
             c1, c2 = ch[f], args[0]
-            if c2 != no:
-                c2 = min(make_divisible(c2 * gw, 8), mc)
+            if c2 != nc:
+                c2 = make_divisible(c2 * gw, 8)
 
             args = [c1, c2, *args[1:]]
+            if m in {C2f, C3, C3Ghost}:
+                args.insert(2, n)
+                n = 1
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:

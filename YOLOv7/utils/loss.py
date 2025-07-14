@@ -906,7 +906,7 @@ class ComputeLossAuxOTA:
 
             y = cls_preds_.sqrt_()
             pair_wise_cls_loss = F.binary_cross_entropy_with_logits(
-               torch.log(y/(1-y)) , gt_cls_per_image, reduction="none"
+                torch.log(y/(1-y)) , gt_cls_per_image, reduction="none"
             ).sum(-1)
             del cls_preds_
 
