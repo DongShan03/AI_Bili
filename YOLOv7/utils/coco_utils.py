@@ -16,7 +16,7 @@ def convert_to_coco_api(ds):
     for img_idx in tqdm(range(len(ds)), desc="loading eval info for coco tools."):
         # find better way to get target
         targets, shapes = ds.coco_index(img_idx)
-        # targets: [num_obj, 6] , that number 6 means -> (img_index, obj_index, x, y, w, h)
+        # targets: [num_obj, 5] , that number 6 means -> (obj_index, x, y, w, h)
         img_dict = {}
         img_dict['id'] = img_idx
         img_dict['height'] = shapes[0]

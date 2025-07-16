@@ -55,6 +55,7 @@ def exif_size(img):
 
 def create_dataloader(path, imgsz, batch_size, single_cls=False, hyp=None, augment=False, cache_images=False, pad=0.0, rect=False,
                     workers=8, image_weights=False, prefix=''):
+
     dataset = LoadImagesAndLabels(path, imgsz, batch_size, hyp=hyp, augment=augment, cache_images=cache_images,
                                 single_cls=single_cls, rect=rect, pad=pad, image_weights=image_weights,
                                 prefix=prefix)
